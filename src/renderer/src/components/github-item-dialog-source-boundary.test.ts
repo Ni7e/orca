@@ -8,6 +8,10 @@ function componentSource(relativePath: string): string {
   return readFileSync(join(COMPONENT_ROOT, relativePath), 'utf8')
 }
 
+function destSources(...relativePaths: string[]): string {
+  return relativePaths.map((relativePath) => componentSource(relativePath)).join('\n')
+}
+
 function sourceBetween(source: string, startPattern: string, endPattern: string): string {
   const start = source.indexOf(startPattern)
   expect(start).toBeGreaterThanOrEqual(0)
@@ -18,7 +22,7 @@ function sourceBetween(source: string, startPattern: string, endPattern: string)
 
 describe('GitHubItemDialog source host boundaries', () => {
   it('does not keep the stale right-side sheet owner', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
+    const source = destSources('GitHubItemDialog.tsx', 'github-item-dialog/github-item-dialog.tsx')
 
     expect(source).not.toContain('@/components/ui/sheet')
     expect(source).not.toContain('<Sheet')
@@ -27,12 +31,11 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('routes reviewer metadata and reviewer mutations through the task source context', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
-    const section = sourceBetween(
-      source,
-      'function PRReviewersPanel',
-      'const WORK_ITEM_DETAILS_CACHE_MAX'
+    const source = destSources(
+      'github-item-dialog/pr-reviewers-panel.tsx',
+      'github-item-dialog/pr-reviewers-request-actions.ts'
     )
+    const section = source
 
     expect(section).toContain('getTaskSourceRuntimeSettings(sourceContext)')
     expect(section).toContain('useRepoAssigneesBySlug(')
@@ -52,8 +55,11 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('routes edit metadata through the same task source as issue mutations', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
-    const section = sourceBetween(source, 'function GHEditSection', 'const hasAttachedWorkspace')
+    const source = destSources(
+      'github-item-dialog/gh-edit-section.tsx',
+      'github-item-dialog/gh-edit-section-mutations.ts'
+    )
+    const section = source
     const helperSection = componentSource('github/github-work-item-edit-mutations.ts')
 
     expect(section).toContain('getTaskSourceRuntimeSettings(sourceContext)')
@@ -80,7 +86,10 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('uses source-aware details routing and cache identity', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
+    const source = destSources(
+      'github-item-dialog/work-item-details-cache.ts',
+      'github-item-dialog/use-github-item-dialog-details.ts'
+    )
     const cacheKeySection = sourceBetween(
       source,
       'function getWorkItemDetailsCacheKey',
@@ -102,7 +111,10 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('treats null details as unavailable while preserving empty detail payloads', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
+    const source = destSources(
+      'github-item-dialog/use-github-item-dialog-details.ts',
+      'github-item-dialog/work-item-details-fetch-settle.ts'
+    )
     const loadedSection = sourceBetween(
       source,
       'const loading = !!cachedEntry?.pending && !cachedEntry?.details',
@@ -118,13 +130,11 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('routes PR file viewed mutations through the task source context', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
-    const helperSection = componentSource('github/github-work-item-comment-mutations.ts')
-    const changeSection = sourceBetween(
-      source,
-      'const handlePRFileViewedChange = useCallback',
-      'const isIssuePage = workItem?.type ==='
+    const changeSection = destSources(
+      'github-item-dialog/use-github-item-dialog-details.ts',
+      'github-item-dialog/pr-file-viewed-change.ts'
     )
+    const helperSection = componentSource('github/github-work-item-comment-mutations.ts')
 
     expect(helperSection).toContain('getGitHubSourceRuntimeHost(args.sourceContext)')
     expect(helperSection).toContain("'github.setPRFileViewed'")
@@ -137,9 +147,9 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('routes comment mutations through runtime source context when needed', () => {
-    const source = componentSource('github/github-work-item-comment-mutations.ts')
+    const helperSource = componentSource('github/github-work-item-comment-mutations.ts')
     const helperSection = sourceBetween(
-      source,
+      helperSource,
       'function addIssueCommentForRepo',
       'function setPRFileViewedForRepo'
     )
@@ -155,12 +165,15 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('routes PR file contents and runtime viewed invalidations through the task source context', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
+    const source = destSources(
+      'github-item-dialog/work-item-details-cache.ts',
+      'github-item-dialog/pr-file-content-cache.ts'
+    )
     const commentMutations = componentSource('github/github-work-item-comment-mutations.ts')
     const fileContentsSection = sourceBetween(
       source,
       'function loadPRFileContents',
-      'function PRFilesCombinedDiffViewer'
+      'touchPRFileContentCache(cacheKey, request)'
     )
     const fileContentsCacheKeySection = sourceBetween(
       source,
@@ -185,12 +198,7 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('routes merge actions through the repo owner host (#6957)', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
-    const actionsSection = sourceBetween(
-      source,
-      'function PRActionsPanel',
-      'function CommentReplyForm'
-    )
+    const actionsSection = componentSource('github-item-dialog/pr-actions-panel.tsx')
 
     expect(actionsSection).toContain(
       'getGitHubMutationRoutingSettings(s, item.repoId ?? repoId ?? null, sourceContext)'
@@ -212,11 +220,10 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('routes check actions through the task source context', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
-    const checksSection = sourceBetween(
-      source,
-      'function ChecksTab',
-      'function GitHubLabelsSettingsLink'
+    const checksSection = destSources(
+      'github-item-dialog/checks-tab.tsx',
+      'github-item-dialog/checks-tab-actions.ts',
+      'github-item-dialog/checks-tab-request-details.ts'
     )
 
     expect(checksSection).toContain('sourceContext?: TaskSourceContext | null')
@@ -225,23 +232,23 @@ describe('GitHubItemDialog source host boundaries', () => {
     expect(checksSection).toContain("'github.rerunPRChecks'")
     expect(checksSection).toContain("'github.prCheckDetails'")
     expect(checksSection).toContain(
-      'repo: getGitHubRuntimeRepoId(sourceContext, repoId ?? item.repoId)'
+      'repo: getGitHubRuntimeRepoId(ctx.sourceContext, ctx.repoId ?? ctx.item.repoId)'
     )
     expect(checksSection).toContain('window.api.gh.prChecks({')
     expect(checksSection).toContain('window.api.gh.rerunPRChecks({')
     expect(checksSection).toContain('prCheckDetails({')
     expect(checksSection).toMatch(
-      /withGitHubCheckDetailsTimeout\(\(signal\) =>\s*runtimeHost\s*\?\s*callRuntimeRpc[\s\S]*:\s*window\.api\.gh\.prCheckDetails\(\{/
+      /withGitHubCheckDetailsTimeout\(\(signal\) =>\s*ctx\.runtimeHost\s*\?\s*callRuntimeRpc[\s\S]*:\s*window\.api\.gh\.prCheckDetails\(\{/
     )
     expect(checksSection).toContain('{ timeoutMs: 30_000, signal }')
   })
 
   it('makes failed check detail loads retryable and fences stale responses', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
-    const checksSection = sourceBetween(
-      source,
-      'function ChecksTab',
-      'function GitHubLabelsSettingsLink'
+    const checksSection = destSources(
+      'github-item-dialog/checks-tab.tsx',
+      'github-item-dialog/checks-tab-actions.ts',
+      'github-item-dialog/checks-tab-request-details.ts',
+      'github-item-dialog/checks-tab-check-details.tsx'
     )
 
     expect(checksSection).toContain('createGitHubChecksTabState(checks, checkDetailsContextKey)')
@@ -253,15 +260,15 @@ describe('GitHubItemDialog source host boundaries', () => {
     expect(checksSection).toContain('activeChecksRefreshRequestIdRef.current !== refreshRequestId')
     expect(checksSection).toContain('current.contextOwner === refreshContextOwner')
     expect(checksSection).toContain(
-      'const rerunContextOwner = committedChecksContextOwnerRef.current'
+      'const rerunContextOwner = ctx.committedChecksContextOwnerRef.current'
     )
-    expect(checksSection).toContain('committedChecksContextOwnerRef.current !== rerunContextOwner')
-    expect(checksSection).toContain('await handleRefresh(rerunContextOwner)')
-    expect(checksSection).toContain('!mountedRef.current ||')
-    expect(checksSection).toContain('settleGitHubChecksTabDetails(current, key, requestId, next)')
     expect(checksSection).toContain(
-      'onClick={() => requestCheckDetails(check, getCheckDetailsKey(check))}'
+      'ctx.committedChecksContextOwnerRef.current !== rerunContextOwner'
     )
+    expect(checksSection).toContain('await refreshGitHubChecksTab(ctx, rerunContextOwner)')
+    expect(checksSection).toContain('!ctx.mountedRef.current ||')
+    expect(checksSection).toContain('settleGitHubChecksTabDetails(current, key, requestId, next)')
+    expect(checksSection).toContain('onClick={() => onRetry(check, getCheckDetailsKey(check))}')
     expect(checksSection).toContain('disabled={state.loading}')
     expect(checksSection).toContain('aria-busy={state.loading}')
     expect(checksSection).toContain("translate('githubChecks.retrying', 'Retrying…')")
@@ -269,7 +276,7 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('uses hydrated work item details for the page checks tab', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
+    const source = componentSource('github-item-dialog/github-item-dialog-pr-tabs.tsx')
     const checksTab = sourceBetween(
       source,
       '<TabsContent value="checks"',
@@ -280,19 +287,14 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('records state authority for dialog state mutations so stale list refetches cannot revert them (STA-3343)', () => {
-    const source = componentSource('GitHubItemDialog.tsx')
-
-    // Issue close/reopen: assert on optimistic apply, revert on failure.
-    const editSection = sourceBetween(source, 'function GHEditSection', 'const closeAsDuplicate')
+    const editSection = destSources(
+      'github-item-dialog/gh-edit-section.tsx',
+      'github-item-dialog/gh-edit-section-mutations.ts'
+    )
     expect(editSection).toContain('assertTaskPageGitHubDialogStateAuthority({')
     expect(editSection).toContain('if (authority?.revert())')
 
-    // PR close/reopen + merge: same protection for the shared Tasks list rows.
-    const actionsSection = sourceBetween(
-      source,
-      'function PRActionsPanel',
-      'function CommentReplyForm'
-    )
+    const actionsSection = componentSource('github-item-dialog/pr-actions-panel.tsx')
     expect(actionsSection.match(/assertTaskPageGitHubDialogStateAuthority\(\{/g)).toHaveLength(2)
     expect(actionsSection).toContain('if (authority.revert())')
     expect(actionsSection).toContain("state: 'merged'")
