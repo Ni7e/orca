@@ -91,8 +91,7 @@ export class MobileSessionTabsStreamHealth<Result, Tab> {
       return null
     }
     const recoveryNeeded = this.options.hasRecoveryNeed()
-    const currentRequest = this.inFlight.get(`${this.generation}:${this.barrier}`)
-    if (recoveryNeeded && !currentRequest && this.options.allowRecoveryPoll?.() === false) {
+    if (recoveryNeeded && this.options.allowRecoveryPoll?.() === false) {
       return null
     }
     if (this.health === 'live') {
