@@ -19,8 +19,8 @@ function sourceBetween(source: string, startPattern: string, endPattern: string)
 describe('task drawer source boundaries', () => {
   it('threads GitHub task source context through detail mutations', () => {
     const source = [
-      componentSource('github-item-dialog/gh-edit-section.tsx'),
-      componentSource('github-item-dialog/gh-edit-section-mutations.ts')
+      componentSource('github-item-dialog/edit-item-fields/gh-edit-section.tsx'),
+      componentSource('github-item-dialog/edit-item-fields/gh-edit-section-mutations.ts')
     ].join('\n')
     const issueUpdate = sourceBetween(
       componentSource('github/github-work-item-edit-mutations.ts'),

@@ -22,7 +22,10 @@ function sourceBetween(source: string, startPattern: string, endPattern: string)
 
 describe('GitHubItemDialog source host boundaries', () => {
   it('does not keep the stale right-side sheet owner', () => {
-    const source = destSources('GitHubItemDialog.tsx', 'github-item-dialog/github-item-dialog.tsx')
+    const source = destSources(
+      'GitHubItemDialog.tsx',
+      'github-item-dialog/open-dialog/github-item-dialog.tsx'
+    )
 
     expect(source).not.toContain('@/components/ui/sheet')
     expect(source).not.toContain('<Sheet')
@@ -32,8 +35,8 @@ describe('GitHubItemDialog source host boundaries', () => {
 
   it('routes reviewer metadata and reviewer mutations through the task source context', () => {
     const source = destSources(
-      'github-item-dialog/pr-reviewers-panel.tsx',
-      'github-item-dialog/pr-reviewers-request-actions.ts'
+      'github-item-dialog/land-pull-request/pr-reviewers-panel.tsx',
+      'github-item-dialog/land-pull-request/pr-reviewers-request-actions.ts'
     )
     const section = source
 
@@ -56,8 +59,8 @@ describe('GitHubItemDialog source host boundaries', () => {
 
   it('routes edit metadata through the same task source as issue mutations', () => {
     const source = destSources(
-      'github-item-dialog/gh-edit-section.tsx',
-      'github-item-dialog/gh-edit-section-mutations.ts'
+      'github-item-dialog/edit-item-fields/gh-edit-section.tsx',
+      'github-item-dialog/edit-item-fields/gh-edit-section-mutations.ts'
     )
     const section = source
     const helperSection = componentSource('github/github-work-item-edit-mutations.ts')
@@ -87,8 +90,8 @@ describe('GitHubItemDialog source host boundaries', () => {
 
   it('uses source-aware details routing and cache identity', () => {
     const source = destSources(
-      'github-item-dialog/work-item-details-cache.ts',
-      'github-item-dialog/use-github-item-dialog-details.ts'
+      'github-item-dialog/load-item-details/work-item-details-cache.ts',
+      'github-item-dialog/load-item-details/use-github-item-dialog-details.ts'
     )
     const cacheKeySection = sourceBetween(
       source,
@@ -112,8 +115,8 @@ describe('GitHubItemDialog source host boundaries', () => {
 
   it('treats null details as unavailable while preserving empty detail payloads', () => {
     const source = destSources(
-      'github-item-dialog/use-github-item-dialog-details.ts',
-      'github-item-dialog/work-item-details-fetch-settle.ts'
+      'github-item-dialog/load-item-details/use-github-item-dialog-details.ts',
+      'github-item-dialog/load-item-details/work-item-details-fetch-settle.ts'
     )
     const loadedSection = sourceBetween(
       source,
@@ -131,8 +134,8 @@ describe('GitHubItemDialog source host boundaries', () => {
 
   it('routes PR file viewed mutations through the task source context', () => {
     const changeSection = destSources(
-      'github-item-dialog/use-github-item-dialog-details.ts',
-      'github-item-dialog/pr-file-viewed-change.ts'
+      'github-item-dialog/load-item-details/use-github-item-dialog-details.ts',
+      'github-item-dialog/load-item-details/pr-file-viewed-change.ts'
     )
     const helperSection = componentSource('github/github-work-item-comment-mutations.ts')
 
@@ -166,8 +169,8 @@ describe('GitHubItemDialog source host boundaries', () => {
 
   it('routes PR file contents and runtime viewed invalidations through the task source context', () => {
     const source = destSources(
-      'github-item-dialog/work-item-details-cache.ts',
-      'github-item-dialog/pr-file-content-cache.ts'
+      'github-item-dialog/load-item-details/work-item-details-cache.ts',
+      'github-item-dialog/load-item-details/pr-file-content-cache.ts'
     )
     const commentMutations = componentSource('github/github-work-item-comment-mutations.ts')
     const fileContentsSection = sourceBetween(
@@ -198,7 +201,9 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('routes merge actions through the repo owner host (#6957)', () => {
-    const actionsSection = componentSource('github-item-dialog/pr-actions-panel.tsx')
+    const actionsSection = componentSource(
+      'github-item-dialog/land-pull-request/pr-actions-panel.tsx'
+    )
 
     expect(actionsSection).toContain(
       'getGitHubMutationRoutingSettings(s, item.repoId ?? repoId ?? null, sourceContext)'
@@ -221,9 +226,9 @@ describe('GitHubItemDialog source host boundaries', () => {
 
   it('routes check actions through the task source context', () => {
     const checksSection = destSources(
-      'github-item-dialog/checks-tab.tsx',
-      'github-item-dialog/checks-tab-actions.ts',
-      'github-item-dialog/checks-tab-request-details.ts'
+      'github-item-dialog/inspect-pull-request/checks-tab.tsx',
+      'github-item-dialog/inspect-pull-request/checks-tab-actions.ts',
+      'github-item-dialog/inspect-pull-request/checks-tab-request-details.ts'
     )
 
     expect(checksSection).toContain('sourceContext?: TaskSourceContext | null')
@@ -245,10 +250,10 @@ describe('GitHubItemDialog source host boundaries', () => {
 
   it('makes failed check detail loads retryable and fences stale responses', () => {
     const checksSection = destSources(
-      'github-item-dialog/checks-tab.tsx',
-      'github-item-dialog/checks-tab-actions.ts',
-      'github-item-dialog/checks-tab-request-details.ts',
-      'github-item-dialog/checks-tab-check-details.tsx'
+      'github-item-dialog/inspect-pull-request/checks-tab.tsx',
+      'github-item-dialog/inspect-pull-request/checks-tab-actions.ts',
+      'github-item-dialog/inspect-pull-request/checks-tab-request-details.ts',
+      'github-item-dialog/inspect-pull-request/checks-tab-check-details.tsx'
     )
 
     expect(checksSection).toContain('createGitHubChecksTabState(checks, checkDetailsContextKey)')
@@ -276,7 +281,7 @@ describe('GitHubItemDialog source host boundaries', () => {
   })
 
   it('uses hydrated work item details for the page checks tab', () => {
-    const source = componentSource('github-item-dialog/github-item-dialog-pr-tabs.tsx')
+    const source = componentSource('github-item-dialog/open-dialog/github-item-dialog-pr-tabs.tsx')
     const checksTab = sourceBetween(
       source,
       '<TabsContent value="checks"',
@@ -288,13 +293,15 @@ describe('GitHubItemDialog source host boundaries', () => {
 
   it('records state authority for dialog state mutations so stale list refetches cannot revert them (STA-3343)', () => {
     const editSection = destSources(
-      'github-item-dialog/gh-edit-section.tsx',
-      'github-item-dialog/gh-edit-section-mutations.ts'
+      'github-item-dialog/edit-item-fields/gh-edit-section.tsx',
+      'github-item-dialog/edit-item-fields/gh-edit-section-mutations.ts'
     )
     expect(editSection).toContain('assertTaskPageGitHubDialogStateAuthority({')
     expect(editSection).toContain('if (authority?.revert())')
 
-    const actionsSection = componentSource('github-item-dialog/pr-actions-panel.tsx')
+    const actionsSection = componentSource(
+      'github-item-dialog/land-pull-request/pr-actions-panel.tsx'
+    )
     expect(actionsSection.match(/assertTaskPageGitHubDialogStateAuthority\(\{/g)).toHaveLength(2)
     expect(actionsSection).toContain('if (authority.revert())')
     expect(actionsSection).toContain("state: 'merged'")
