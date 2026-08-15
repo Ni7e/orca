@@ -746,6 +746,19 @@ describe('recordProcessGoneCrash whole-process-tree kills', () => {
     expect(record).not.toHaveBeenCalled()
   })
 
+  // The renderer-first side is the 250ms settle, not a symmetric 2s wait.
+  it('files before a sibling arriving after the settle', async () => {
+    const record = vi.fn().mockResolvedValue({ id: 'report-1' })
+    const dedupe = new ProcessGoneDedupe()
+    vi.useFakeTimers()
+
+    recordProcessGoneCrash({ record } as never, rendererKill, dedupe)
+    await vi.advanceTimersByTimeAsync(251)
+    recordProcessGoneCrash({ record } as never, gpuKill, dedupe)
+
+    expect(record).toHaveBeenCalledOnce()
+  })
+
   // Wall-clock corrections must not split one event wave across the 2s window.
   it('keeps renderer-first correlation across wall-clock jumps', async () => {
     const record = vi.fn().mockResolvedValue({ id: 'report-1' })
