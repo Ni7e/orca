@@ -181,7 +181,6 @@ export function recordProcessGoneCrash(
   const siblingKills = siblingProcessTreeKillCount(event)
   if (event.reason === 'killed') {
     observeProcessGoneKill({
-      at: Date.now(),
       source: event.source,
       reason: event.reason,
       exitCode: event.exitCode

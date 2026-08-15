@@ -21,7 +21,7 @@ describe('countSiblingProcessTreeKills', () => {
     expect(countSiblingProcessTreeKills({ reason: 'killed', exitCode: 1, at: 1_150 })).toBe(2)
   })
 
-  it('ignores kills outside the correlation window in either direction', () => {
+  it('ignores kills outside the lookback or after the queried instant', () => {
     observeProcessGoneKill(childKill(1_000))
 
     expect(
@@ -31,9 +31,7 @@ describe('countSiblingProcessTreeKills', () => {
         at: 1_000 + PROCESS_TREE_KILL_WINDOW_MS + 1
       })
     ).toBe(0)
-    // The renderer can die before its children; a child kill shortly *after*
-    // the queried instant still counts.
-    expect(countSiblingProcessTreeKills({ reason: 'killed', exitCode: 1, at: 900 })).toBe(1)
+    expect(countSiblingProcessTreeKills({ reason: 'killed', exitCode: 1, at: 900 })).toBe(0)
   })
 
   it('counts a child kill at exactly the window boundary', () => {
@@ -48,16 +46,10 @@ describe('countSiblingProcessTreeKills', () => {
     ).toBe(1)
   })
 
-  it('pins the boundary on the future side of the queried instant too', () => {
+  it('never counts future evidence as part of the lookback', () => {
     observeProcessGoneKill(childKill(10_000))
 
-    expect(
-      countSiblingProcessTreeKills({
-        reason: 'killed',
-        exitCode: 1,
-        at: 10_000 - PROCESS_TREE_KILL_WINDOW_MS
-      })
-    ).toBe(1)
+    expect(countSiblingProcessTreeKills({ reason: 'killed', exitCode: 1, at: 9_999 })).toBe(0)
     expect(
       countSiblingProcessTreeKills({
         reason: 'killed',
@@ -67,7 +59,7 @@ describe('countSiblingProcessTreeKills', () => {
     ).toBe(0)
   })
 
-  // Literal on purpose: the ±2s margin over the observed ≤0.1s field offsets is
+  // Literal on purpose: the 2s margin over the observed ≤0.1s field offsets is
   // the contract; a shrunken window would pass every symbolic-constant test.
   it('keeps a kill 1.9s away inside the window', () => {
     observeProcessGoneKill(childKill(1_000))

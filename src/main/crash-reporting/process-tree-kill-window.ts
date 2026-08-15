@@ -27,13 +27,16 @@ type TrackedKill = {
 
 let trackedKills: TrackedKill[] = []
 
-export function observeProcessGoneKill(kill: TrackedKill): void {
+export function observeProcessGoneKill({
+  at = performance.now(),
+  ...kill
+}: Omit<TrackedKill, 'at'> & { at?: number }): void {
   // Why: only child kills count as siblings; letting renderer entries into the
   // ring would evict the child evidence a later renderer event needs.
   if (kill.source !== 'child') {
     return
   }
-  trackedKills.push(kill)
+  trackedKills.push({ ...kill, at })
   if (trackedKills.length > MAX_TRACKED_KILLS) {
     trackedKills = trackedKills.slice(-MAX_TRACKED_KILLS)
   }
@@ -44,18 +47,21 @@ export function observeProcessGoneKill(kill: TrackedKill): void {
 export function countSiblingProcessTreeKills({
   reason,
   exitCode,
-  at = Date.now()
+  at = performance.now()
 }: {
   reason: string
   exitCode: number | null
   at?: number
 }): number {
-  return trackedKills.filter(
-    (kill) =>
+  return trackedKills.filter((kill) => {
+    const age = at - kill.at
+    return (
       kill.reason === reason &&
       kill.exitCode === exitCode &&
-      Math.abs(at - kill.at) <= PROCESS_TREE_KILL_WINDOW_MS
-  ).length
+      age >= 0 &&
+      age <= PROCESS_TREE_KILL_WINDOW_MS
+    )
+  }).length
 }
 
 export function resetProcessTreeKillWindowForTest(): void {

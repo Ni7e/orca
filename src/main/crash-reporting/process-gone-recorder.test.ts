@@ -668,7 +668,7 @@ describe('recordProcessGoneCrash whole-process-tree kills', () => {
   })
 
   // A kill loop must not become self-suppressing: churn from one iteration
-  // ages out of the ±2s window and the next solitary kill still reports.
+  // ages out of the 2s lookback and the next solitary kill still reports.
   it('stops suppressing once the churn ages out of the correlation window', async () => {
     const record = vi.fn().mockResolvedValue({ id: 'report-1' })
     const dedupe = new ProcessGoneDedupe()
@@ -741,6 +741,23 @@ describe('recordProcessGoneCrash whole-process-tree kills', () => {
     recordProcessGoneCrash({ record } as never, rendererKill, dedupe)
     vi.advanceTimersByTime(200)
     recordProcessGoneCrash({ record } as never, gpuKill, dedupe)
+    await vi.advanceTimersByTimeAsync(250)
+
+    expect(record).not.toHaveBeenCalled()
+  })
+
+  // Wall-clock corrections must not split one event wave across the 2s window.
+  it('keeps renderer-first correlation across wall-clock jumps', async () => {
+    const record = vi.fn().mockResolvedValue({ id: 'report-1' })
+    const dedupe = new ProcessGoneDedupe()
+    vi.useFakeTimers()
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_000)
+
+    recordProcessGoneCrash({ record } as never, rendererKill, dedupe)
+    nowSpy.mockReturnValue(100_000)
+    vi.advanceTimersByTime(40)
+    recordProcessGoneCrash({ record } as never, gpuKill, dedupe)
+    nowSpy.mockReturnValue(200_000)
     await vi.advanceTimersByTimeAsync(250)
 
     expect(record).not.toHaveBeenCalled()
