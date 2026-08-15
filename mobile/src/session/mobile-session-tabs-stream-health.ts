@@ -90,11 +90,11 @@ export class MobileSessionTabsStreamHealth<Result, Tab> {
     if (!this.reconciliationActive) {
       return null
     }
+    const recoveryNeeded = this.options.hasRecoveryNeed()
+    if (recoveryNeeded && this.options.allowRecoveryPoll?.() === false) {
+      return null
+    }
     if (this.health === 'live') {
-      const recoveryNeeded = this.options.hasRecoveryNeed()
-      if (recoveryNeeded && this.options.allowRecoveryPoll?.() === false) {
-        return null
-      }
       if (!recoveryNeeded && this.requirementRevision <= this.satisfiedRevision) {
         return null
       }

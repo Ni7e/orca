@@ -187,16 +187,13 @@ describe('mobile session startup', () => {
     )
   })
 
-  it('counts a pending-handle active terminal as a tabs recovery need (STA-4256)', () => {
-    const recoveryNeed = sliceBetween(
-      'const hasSessionTabsRecoveryNeed = useCallback(',
-      'const getSessionTabsApplicationRevision ='
-    )
-
-    expect(recoveryNeed).toContain('hasPendingTerminalHandleRecoveryNeed(')
-    expect(recoveryNeed).toContain('sessionTabsRef.current')
-    expect(recoveryNeed).toContain('activeSessionTabIdRef.current')
-    // The predicate only reaches the poll loop through this hook's option.
+  it('wires pending-handle recovery through its bounded context (STA-4256)', () => {
+    expect(source).toContain('getPendingTerminalHandleRecoveryContextKey(')
+    expect(source).toContain('sessionTabsRef.current')
+    expect(source).toContain('activeSessionTabIdRef.current')
     expect(source).toContain('hasRecoveryNeed: hasSessionTabsRecoveryNeed')
+    expect(source).toContain('getPendingTerminalRecoveryContextKey,')
+    expect(source).toContain('onPendingTerminalRecoveryParked: setParkedPendingTerminalContext')
+    expect(source).toContain('retryPendingTerminalRecovery()')
   })
 })

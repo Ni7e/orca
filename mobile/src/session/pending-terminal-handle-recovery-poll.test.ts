@@ -50,7 +50,8 @@ function makeHarness() {
   let contextKey: string | null = 'terminal-a'
   let connState: 'connected' | 'disconnected' = 'connected'
   let streamListener: ((payload: unknown) => void) | null = null
-  let actions: ReturnType<typeof useMobileSessionTabsReconciliation<TestResult, string>> | null = null
+  let actions: ReturnType<typeof useMobileSessionTabsReconciliation<TestResult, string>> | null =
+    null
   const sendRequest = vi.fn(async (): Promise<RpcSuccess> => {
     requestTimes.push(Date.now())
     return {
@@ -67,9 +68,15 @@ function makeHarness() {
     }
   )
   const client = { sendRequest, subscribe } as unknown as RpcClient
-  const applySessionTabs = (
-    value: TestResult
-  ): SessionTabsApplyOutcome<string> => ({ accepted: true, effectiveTabs: value.tabs })
+  const consumeAcceptedSessionTabs = () => {}
+  const fetchTerminals = async () => {}
+  const getPendingTerminalRecoveryContextKey = () => contextKey
+  const hasRecoveryNeed = () => false
+  const onPendingTerminalRecoveryParked = (key: string | null) => parkedContexts.push(key)
+  const applySessionTabs = (value: TestResult): SessionTabsApplyOutcome<string> => ({
+    accepted: true,
+    effectiveTabs: value.tabs
+  })
 
   function Harness(): null {
     actions = useMobileSessionTabsReconciliation<TestResult, string>({
@@ -77,11 +84,11 @@ function makeHarness() {
       connState,
       worktreeId: 'repo::worktree',
       applySessionTabs,
-      consumeAcceptedSessionTabs: () => {},
-      fetchTerminals: async () => {},
-      hasRecoveryNeed: () => false,
-      getPendingTerminalRecoveryContextKey: () => contextKey,
-      onPendingTerminalRecoveryParked: (key) => parkedContexts.push(key)
+      consumeAcceptedSessionTabs,
+      fetchTerminals,
+      hasRecoveryNeed,
+      getPendingTerminalRecoveryContextKey,
+      onPendingTerminalRecoveryParked
     })
     return null
   }
@@ -105,8 +112,9 @@ function makeHarness() {
 }
 
 async function flush(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
+  for (let turn = 0; turn < 8; turn += 1) {
+    await Promise.resolve()
+  }
 }
 
 describe('bounded pending-handle reconciliation cadence', () => {
@@ -129,6 +137,8 @@ describe('bounded pending-handle reconciliation cadence', () => {
   async function mount(harness: ReturnType<typeof makeHarness>): Promise<void> {
     await act(async () => {
       renderer = create(createElement(harness.Harness))
+      await flush()
+      harness.emit(result('snapshot'))
       await flush()
       harness.emit(result('updated'))
       await flush()
@@ -172,13 +182,14 @@ describe('bounded pending-handle reconciliation cadence', () => {
 
     harness.setContextKey(null)
     await advance(2000)
+    const afterActiveTabChange = harness.requestTimes.length
     harness.setContextKey('terminal-a')
     await advance(2000)
-    expect(harness.requestTimes).toHaveLength(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS + 1)
+    expect(harness.requestTimes).toHaveLength(afterActiveTabChange + 1)
 
     harness.setContextKey('terminal-b')
     await advance(2000)
-    expect(harness.requestTimes).toHaveLength(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS + 2)
+    expect(harness.requestTimes).toHaveLength(afterActiveTabChange + 2)
   })
 
   it('resets after foregrounding, reconnecting, and explicit retry', async () => {

@@ -28,7 +28,7 @@ export class PendingTerminalHandleRecoveryBudget {
       return { allowed: false, parked: true }
     }
     this.remaining -= 1
-    return { allowed: true, parked: this.remaining === 0 }
+    return { allowed: true, parked: false }
   }
 
   reset(): void {

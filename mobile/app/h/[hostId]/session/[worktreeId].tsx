@@ -207,7 +207,6 @@ import {
   confirmsMirroredTabSelection,
   type AppliedSnapshotMarker
 } from '../../../../src/session/session-tab-snapshot-gate'
-import { hasPendingTerminalHandleRecoveryNeed } from '../../../../src/session/pending-terminal-handle-recovery'
 import {
   createInitialSessionAutoCreateState,
   useInitialSessionTerminalAutoCreate,
@@ -254,6 +253,7 @@ import type {
 } from '../../../../src/session/mobile-session-tabs-stream-health'
 import { useMobileSessionTabsFetchReporting } from '../../../../src/session/use-mobile-session-tabs-fetch-reporting'
 import { useMobileSessionTabsReconciliation } from '../../../../src/session/use-mobile-session-tabs-reconciliation'
+import { getPendingTerminalHandleRecoveryContextKey } from '../../../../src/session/pending-terminal-handle-recovery'
 import {
   getRepoIdFromMobileWorktreeId,
   getActiveTabIdForHandle,
@@ -936,6 +936,9 @@ export default function SessionScreen() {
   const pendingBrowserFocusPageIdRef = useRef<string | null>(null)
   const switchSessionTabRef = useRef<((tab: MobileSessionTab) => void) | null>(null)
   const pendingTerminalActivationAttemptRef = useRef<string | null>(null)
+  const [parkedPendingTerminalContext, setParkedPendingTerminalContext] = useState<string | null>(
+    null
+  )
   // Why: route the terminal URL tap through a ref so it runs the current handleCreateBrowser closure (the memoized one may hold a null-client render).
   const handleCreateBrowserRef = useRef<((rawUrl?: string) => Promise<boolean>) | null>(null)
 
@@ -2284,15 +2287,19 @@ export default function SessionScreen() {
     () =>
       closedTabTombstonesRef.current.size > 0 ||
       pendingBrowserFocusPageIdRef.current !== null ||
-      // Why: a pending-handle terminal only turns ready in a fresh snapshot. A live
-      // stream otherwise parks the poll, and a host that mints the handle without
-      // republishing strands the pane on its spinner forever (STA-4256).
-      hasPendingTerminalHandleRecoveryNeed(sessionTabsRef.current, activeSessionTabIdRef.current) ||
       // Why: a chat-covered handle that ran out of rearms and left `terminal.list`
       // was reminted by a desktop graph reload. Only a fresh tab snapshot carries
       // the replacement handle, so force one instead of holding the composer locked.
       nativeChatStream.hasTabsRecoveryNeed(),
     [nativeChatStream]
+  )
+  const getPendingTerminalRecoveryContextKey = useCallback(
+    () =>
+      getPendingTerminalHandleRecoveryContextKey(
+        sessionTabsRef.current,
+        activeSessionTabIdRef.current
+      ),
+    []
   )
   const getSessionTabsApplicationRevision = useCallback(
     () => appliedSessionTabsRevisionRef.current,
@@ -2302,18 +2309,24 @@ export default function SessionScreen() {
     worktreeId,
     diagnosticsRef: terminalDiagnosticsRef
   })
-  const { fetchSessionTabs, ensureSessionTabs, fetchPendingBrowserSessionTabs } =
-    useMobileSessionTabsReconciliation<SessionTabsResult, MobileSessionTab>({
-      client,
-      connState,
-      worktreeId,
-      applySessionTabs,
-      consumeAcceptedSessionTabs,
-      fetchTerminals,
-      hasRecoveryNeed: hasSessionTabsRecoveryNeed,
-      getApplicationRevision: getSessionTabsApplicationRevision,
-      ...sessionTabsFetchReporting
-    })
+  const {
+    fetchSessionTabs,
+    ensureSessionTabs,
+    fetchPendingBrowserSessionTabs,
+    retryPendingTerminalRecovery
+  } = useMobileSessionTabsReconciliation<SessionTabsResult, MobileSessionTab>({
+    client,
+    connState,
+    worktreeId,
+    applySessionTabs,
+    consumeAcceptedSessionTabs,
+    fetchTerminals,
+    hasRecoveryNeed: hasSessionTabsRecoveryNeed,
+    getPendingTerminalRecoveryContextKey,
+    onPendingTerminalRecoveryParked: setParkedPendingTerminalContext,
+    getApplicationRevision: getSessionTabsApplicationRevision,
+    ...sessionTabsFetchReporting
+  })
 
   useEffect(() => {
     if (connState === 'connected') {
@@ -4075,6 +4088,13 @@ export default function SessionScreen() {
     activeSessionTab?.type === 'terminal' && typeof activeSessionTab.terminal !== 'string'
       ? activeSessionTab
       : null
+  const activePendingTerminalContext = getPendingTerminalHandleRecoveryContextKey(
+    sessionTabs,
+    activeSessionTabId
+  )
+  const isPendingTerminalRecoveryParked =
+    activePendingTerminalContext !== null &&
+    activePendingTerminalContext === parkedPendingTerminalContext
 
   useEffect(() => {
     if (!client || connState !== 'connected' || !activePendingTerminalTab) {
@@ -4593,10 +4613,27 @@ export default function SessionScreen() {
               </View>
             ) : activePendingTerminalTab ? (
               <View style={styles.emptyState}>
-                <ActivityIndicator size="small" color={colors.textSecondary} />
+                {!isPendingTerminalRecoveryParked && (
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                )}
                 <Text style={styles.emptyText}>
-                  {activePendingTerminalTab.title || 'Loading terminal'}
+                  {isPendingTerminalRecoveryParked
+                    ? 'Terminal is taking longer than expected'
+                    : activePendingTerminalTab.title || 'Loading terminal'}
                 </Text>
+                {isPendingTerminalRecoveryParked && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry loading terminal"
+                    style={({ pressed }) => [
+                      styles.createButton,
+                      pressed && styles.newTerminalButtonPressed
+                    ]}
+                    onPress={() => void retryPendingTerminalRecovery()}
+                  >
+                    <Text style={styles.createButtonText}>Retry</Text>
+                  </Pressable>
+                )}
               </View>
             ) : (
               <View

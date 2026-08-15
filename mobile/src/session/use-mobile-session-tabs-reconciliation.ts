@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { AppState } from 'react-native'
 import { useFocusEffect } from 'expo-router'
 import type { RpcClient } from '../transport/rpc-client'
@@ -56,10 +56,9 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
   onFetchFailed,
   onFetchErrored
 }: Params<Result, Tab>): ResultActions {
-  const pendingTerminalRecoveryBudget = useMemo(
-    () => new PendingTerminalHandleRecoveryBudget(),
-    []
-  )
+  const pendingTerminalRecoveryBudget = useMemo(() => new PendingTerminalHandleRecoveryBudget(), [])
+  const onPendingTerminalRecoveryParkedRef = useRef(onPendingTerminalRecoveryParked)
+  onPendingTerminalRecoveryParkedRef.current = onPendingTerminalRecoveryParked
   const combinedHasRecoveryNeed = useCallback(() => {
     const contextKey = getPendingTerminalRecoveryContextKey?.() ?? null
     pendingTerminalRecoveryBudget.observeContext(contextKey)
@@ -72,19 +71,14 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
     const contextKey = getPendingTerminalRecoveryContextKey?.() ?? null
     const attempt = pendingTerminalRecoveryBudget.take(contextKey)
     if (attempt.parked) {
-      onPendingTerminalRecoveryParked?.(contextKey)
+      onPendingTerminalRecoveryParkedRef.current?.(contextKey)
     }
     return attempt.allowed
-  }, [
-    getPendingTerminalRecoveryContextKey,
-    hasRecoveryNeed,
-    onPendingTerminalRecoveryParked,
-    pendingTerminalRecoveryBudget
-  ])
+  }, [getPendingTerminalRecoveryContextKey, hasRecoveryNeed, pendingTerminalRecoveryBudget])
   const resetPendingTerminalRecovery = useCallback(() => {
     pendingTerminalRecoveryBudget.reset()
-    onPendingTerminalRecoveryParked?.(null)
-  }, [onPendingTerminalRecoveryParked, pendingTerminalRecoveryBudget])
+    onPendingTerminalRecoveryParkedRef.current?.(null)
+  }, [pendingTerminalRecoveryBudget])
   const controller = useMemo(
     () =>
       client
@@ -94,9 +88,7 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
             apply: applySessionTabs,
             consumeAccepted: consumeAcceptedSessionTabs,
             hasRecoveryNeed: combinedHasRecoveryNeed,
-            allowRecoveryPoll: getPendingTerminalRecoveryContextKey
-              ? allowRecoveryPoll
-              : undefined,
+            allowRecoveryPoll: getPendingTerminalRecoveryContextKey ? allowRecoveryPoll : undefined,
             getApplicationRevision,
             onFetchStarted,
             onFetchSucceeded,

@@ -75,7 +75,7 @@ describe('PendingTerminalHandleRecoveryBudget', () => {
     for (let attempt = 1; attempt <= PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS; attempt += 1) {
       expect(budget.take('terminal-a')).toEqual({
         allowed: true,
-        parked: attempt === PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS
+        parked: false
       })
     }
     expect(budget.take('terminal-a')).toEqual({ allowed: false, parked: true })
