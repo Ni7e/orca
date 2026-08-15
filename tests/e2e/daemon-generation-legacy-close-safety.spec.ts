@@ -69,7 +69,7 @@ function launchLegacyCloseClient(options: {
 }): {
   child: ChildProcess
   ready: Promise<LegacyCloseReport>
-  finish(): void
+  finish(): Promise<void>
   output(): string
 } {
   const { runtime, generations, capableCanaries, legacyCanaries } = options
@@ -139,27 +139,80 @@ function launchLegacyCloseClient(options: {
   return {
     child,
     ready,
-    finish: () => {
-      if (child.connected) {
-        child.send?.({ type: 'finish' }, () => {})
+    finish: async () => {
+      if (!child.connected) {
+        throw new Error('Legacy close client IPC channel disconnected before finish handshake')
       }
+      await new Promise<void>((resolve, reject) => {
+        child.send({ type: 'finish' }, (error) => {
+          if (error) {
+            reject(error)
+            return
+          }
+          resolve()
+        })
+      })
     },
     output: () => output
   }
 }
 
+async function terminateLegacyCloseClient(
+  client: ReturnType<typeof launchLegacyCloseClient>,
+  identity: Awaited<ReturnType<typeof recordProcessIdentity>> | null
+): Promise<void> {
+  if (legacyCloseClientExited(client)) {
+    return
+  }
+  if (identity) {
+    await terminateRecordedTree(await recordProcessTree(identity))
+    return
+  }
+  // Why: identity capture can race with teardown; the direct child handle is the last cleanup path.
+  client.child.kill('SIGKILL')
+  await waitForCondition(
+    'forced legacy close client exit',
+    () => legacyCloseClientExited(client),
+    5_000
+  )
+}
+
+function legacyCloseClientExited(client: ReturnType<typeof launchLegacyCloseClient>): boolean {
+  return client.child.exitCode !== null || client.child.signalCode !== null
+}
+
 async function finishLegacyCloseClient(
   client: ReturnType<typeof launchLegacyCloseClient>
 ): Promise<void> {
-  if (!client.child.pid || client.child.exitCode !== null) {
+  if (!client.child.pid || legacyCloseClientExited(client)) {
     return
   }
-  const identity = await recordProcessIdentity(client.child.pid)
-  client.finish()
+  const identity = await recordProcessIdentity(client.child.pid).catch(() => null)
+  let finishError: unknown
+  let finishFailed = false
   try {
-    await waitForCondition('legacy close client exit', () => client.child.exitCode !== null, 2_000)
+    await client.finish()
+  } catch (error) {
+    finishError = error
+    finishFailed = true
+  }
+  try {
+    await waitForCondition('legacy close client exit', () => legacyCloseClientExited(client), 2_000)
   } catch {
-    await terminateRecordedTree(await recordProcessTree(identity))
+    try {
+      await terminateLegacyCloseClient(client, identity)
+    } catch (cleanupError) {
+      if (finishFailed) {
+        throw new AggregateError(
+          [finishError, cleanupError],
+          'Legacy close client finish handshake and forced cleanup both failed'
+        )
+      }
+      throw cleanupError
+    }
+  }
+  if (finishFailed) {
+    throw finishError
   }
 }
 
