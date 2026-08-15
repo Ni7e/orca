@@ -8,6 +8,7 @@ import {
   type SessionTabsApplyOutcome,
   type SessionTabsStreamSource
 } from './mobile-session-tabs-stream-health'
+import { PendingTerminalHandleRecoveryBudget } from './pending-terminal-handle-recovery'
 
 type Params<Result, Tab> = {
   client: RpcClient | null
@@ -21,6 +22,8 @@ type Params<Result, Tab> = {
   ) => void
   fetchTerminals: () => Promise<void>
   hasRecoveryNeed: () => boolean
+  getPendingTerminalRecoveryContextKey?: () => string | null
+  onPendingTerminalRecoveryParked?: (contextKey: string | null) => void
   getApplicationRevision?: () => number
   onFetchStarted?: () => void
   onFetchSucceeded?: (result: Result) => void
@@ -32,6 +35,7 @@ type ResultActions = {
   fetchSessionTabs: () => Promise<void>
   ensureSessionTabs: () => Promise<void>
   fetchPendingBrowserSessionTabs: () => Promise<void>
+  retryPendingTerminalRecovery: () => Promise<void>
 }
 
 const resolved = Promise.resolve()
@@ -44,12 +48,43 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
   consumeAcceptedSessionTabs,
   fetchTerminals,
   hasRecoveryNeed,
+  getPendingTerminalRecoveryContextKey,
+  onPendingTerminalRecoveryParked,
   getApplicationRevision,
   onFetchStarted,
   onFetchSucceeded,
   onFetchFailed,
   onFetchErrored
 }: Params<Result, Tab>): ResultActions {
+  const pendingTerminalRecoveryBudget = useMemo(
+    () => new PendingTerminalHandleRecoveryBudget(),
+    []
+  )
+  const combinedHasRecoveryNeed = useCallback(() => {
+    const contextKey = getPendingTerminalRecoveryContextKey?.() ?? null
+    pendingTerminalRecoveryBudget.observeContext(contextKey)
+    return hasRecoveryNeed() || contextKey !== null
+  }, [getPendingTerminalRecoveryContextKey, hasRecoveryNeed, pendingTerminalRecoveryBudget])
+  const allowRecoveryPoll = useCallback(() => {
+    if (hasRecoveryNeed()) {
+      return true
+    }
+    const contextKey = getPendingTerminalRecoveryContextKey?.() ?? null
+    const attempt = pendingTerminalRecoveryBudget.take(contextKey)
+    if (attempt.parked) {
+      onPendingTerminalRecoveryParked?.(contextKey)
+    }
+    return attempt.allowed
+  }, [
+    getPendingTerminalRecoveryContextKey,
+    hasRecoveryNeed,
+    onPendingTerminalRecoveryParked,
+    pendingTerminalRecoveryBudget
+  ])
+  const resetPendingTerminalRecovery = useCallback(() => {
+    pendingTerminalRecoveryBudget.reset()
+    onPendingTerminalRecoveryParked?.(null)
+  }, [onPendingTerminalRecoveryParked, pendingTerminalRecoveryBudget])
   const controller = useMemo(
     () =>
       client
@@ -58,7 +93,10 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
             scope: `id:${worktreeId}`,
             apply: applySessionTabs,
             consumeAccepted: consumeAcceptedSessionTabs,
-            hasRecoveryNeed,
+            hasRecoveryNeed: combinedHasRecoveryNeed,
+            allowRecoveryPoll: getPendingTerminalRecoveryContextKey
+              ? allowRecoveryPoll
+              : undefined,
             getApplicationRevision,
             onFetchStarted,
             onFetchSucceeded,
@@ -71,7 +109,9 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
       client,
       consumeAcceptedSessionTabs,
       getApplicationRevision,
-      hasRecoveryNeed,
+      allowRecoveryPoll,
+      combinedHasRecoveryNeed,
+      getPendingTerminalRecoveryContextKey,
       onFetchErrored,
       onFetchFailed,
       onFetchStarted,
@@ -91,6 +131,7 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
     if (!client || !controller || connState !== 'connected') {
       return
     }
+    resetPendingTerminalRecovery()
     const subscription = controller.beginSubscription()
     const unsubscribe = client.subscribe(
       'session.tabs.subscribe',
@@ -101,7 +142,7 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
       subscription.cancel()
       unsubscribe()
     }
-  }, [client, connState, controller, worktreeId])
+  }, [client, connState, controller, resetPendingTerminalRecovery, worktreeId])
 
   useFocusEffect(
     useCallback(() => {
@@ -123,19 +164,21 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
       }
       const appStateSubscription = AppState.addEventListener('change', (state) => {
         if (state === 'active') {
+          resetPendingTerminalRecovery()
           refresh(true)
         } else {
           controller.setReconciliationActive(false)
         }
       })
       const interval = setInterval(() => refresh(false), 2000)
+      resetPendingTerminalRecovery()
       refresh(true)
       return () => {
         controller.setReconciliationActive(false)
         clearInterval(interval)
         appStateSubscription.remove()
       }
-    }, [connState, controller, fetchTerminals])
+    }, [connState, controller, fetchTerminals, resetPendingTerminalRecovery])
   )
 
   return {
@@ -150,6 +193,10 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
     fetchPendingBrowserSessionTabs: useCallback(
       () => controller?.requestPendingRecovery() ?? resolved,
       [controller]
-    )
+    ),
+    retryPendingTerminalRecovery: useCallback(() => {
+      resetPendingTerminalRecovery()
+      return controller?.requestReconciliation() ?? resolved
+    }, [controller, resetPendingTerminalRecovery])
   }
 }

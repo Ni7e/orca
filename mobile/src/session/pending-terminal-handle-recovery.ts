@@ -11,14 +11,18 @@ export class PendingTerminalHandleRecoveryBudget {
   private contextKey: string | null = null
   private remaining = PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS
 
-  take(contextKey: string | null): PendingTerminalHandleRecoveryAttempt {
-    if (contextKey === null) {
-      this.contextKey = null
-      return { allowed: false, parked: false }
+  observeContext(contextKey: string | null): void {
+    if (contextKey === this.contextKey) {
+      return
     }
-    if (contextKey !== this.contextKey) {
-      this.contextKey = contextKey
-      this.remaining = PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS
+    this.contextKey = contextKey
+    this.remaining = PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS
+  }
+
+  take(contextKey: string | null): PendingTerminalHandleRecoveryAttempt {
+    this.observeContext(contextKey)
+    if (contextKey === null) {
+      return { allowed: false, parked: false }
     }
     if (this.remaining === 0) {
       return { allowed: false, parked: true }
