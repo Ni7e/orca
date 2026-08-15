@@ -48,12 +48,14 @@ function recordRendererBreadcrumbTrace(
 // suppressed count instead.
 const DUPLICATE_TAB_OWNER_BREADCRUMB = 'terminal_tab_id_owned_by_multiple_worktrees'
 const PARK_VERDICT_CHURN_BREADCRUMB = 'terminal_park_verdict_churn'
+const PARKING_PASS_BREADCRUMB = 'terminal_parking_pass'
 const COALESCED_RENDERER_BREADCRUMB_NAMES = new Set([
   'renderer_error',
   'renderer_unhandled_rejection',
   'terminal_safe_fit_retry_exhausted',
   DUPLICATE_TAB_OWNER_BREADCRUMB,
   PARK_VERDICT_CHURN_BREADCRUMB,
+  PARKING_PASS_BREADCRUMB,
   TERMINAL_WEBGL_DIAGNOSTIC_BREADCRUMB
 ])
 const RENDERER_BREADCRUMB_COALESCE_MS = 30_000
@@ -66,7 +68,12 @@ const RENDERER_BREADCRUMB_COALESCE_MS = 30_000
 // mounted pane within ~60ms. Windows crash F0BKR84AHEH lost 26-90% of its
 // 30-entry ring to two such bursts. `suppressedSinceLast` keeps the pane count
 // — the only signal these carry — in one slot.
-const NAME_ONLY_COALESCED_BREADCRUMB_NAMES = new Set(['terminal_safe_fit_retry_exhausted'])
+// Parking passes are one process-wide latest-state stream; per-payload keys
+// would defeat the store's newest-payload folding and retained slot.
+const NAME_ONLY_COALESCED_BREADCRUMB_NAMES = new Set([
+  'terminal_safe_fit_retry_exhausted',
+  PARKING_PASS_BREADCRUMB
+])
 
 function rendererBreadcrumbCoalesceKey(
   name: string,

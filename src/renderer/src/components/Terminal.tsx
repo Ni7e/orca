@@ -122,7 +122,10 @@ import {
   selectRetentionForceParkedTerminalWorktrees,
   type TerminalWorktreeRetentionCandidate
 } from './terminal-pane/terminal-hidden-worktree-retention'
-import { recordTerminalWorktreeParkingPass } from './terminal-pane/terminal-worktree-parking-telemetry'
+import {
+  queueTerminalWorktreeParkingPass,
+  resetTerminalWorktreeParkingPassTelemetry
+} from './terminal-pane/terminal-worktree-parking-telemetry'
 import { captureForceParkedWorktreeBuffers } from './terminal-pane/force-park-buffer-capture'
 import { warnTerminalLifecycleAnomaly } from './terminal-pane/terminal-lifecycle-diagnostics'
 import {
@@ -903,6 +906,7 @@ function Terminal(): React.JSX.Element | null {
         window.clearTimeout(timer)
       }
       timers.clear()
+      resetTerminalWorktreeParkingPassTelemetry()
     }
   }, [])
 
@@ -1062,12 +1066,12 @@ function Terminal(): React.JSX.Element | null {
       forceParked: forceParkedWorktreeIds.has(candidate.worktreeId)
     }))
     recordTerminalWorktreeParkingDebugVerdicts(parkingPassVerdicts)
-    // Why breadcrumbed: without the per-pass verdicts a field bundle cannot
-    // separate a resetting hiddenSince clock from a decision-time veto — the
-    // exact ambiguity that stalled the mounted-manager investigations.
-    recordTerminalWorktreeParkingPass({
+    // Defer the census until React commits this pass's pane unmounts.
+    queueTerminalWorktreeParkingPass({
       verdicts: parkingPassVerdicts,
       ordinaryParkedCount: nextParkedTerminalWorktreeIds.size,
+      parkingEnabled: terminalParkingEnabled,
+      retentionBudgetEnabled: terminalRetentionBudgetEnabled,
       nowMs
     })
     const capturedForceParked = forceParkedCaptureDoneRef.current

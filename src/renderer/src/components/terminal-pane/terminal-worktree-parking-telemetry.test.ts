@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TerminalWorktreeParkingDebugVerdict } from './terminal-parking-e2e-overrides'
 
 const harness = vi.hoisted(() => ({
@@ -17,7 +17,7 @@ vi.mock('@/lib/pane-manager/pane-manager-registry', () => ({
 }))
 
 import {
-  recordTerminalWorktreeParkingPass,
+  queueTerminalWorktreeParkingPass,
   resetTerminalWorktreeParkingPassTelemetry,
   summarizeTerminalWorktreeParkingPass
 } from './terminal-worktree-parking-telemetry'
@@ -40,9 +40,15 @@ function verdict(
 
 describe('worktree parking pass telemetry', () => {
   beforeEach(() => {
+    vi.useFakeTimers()
     resetTerminalWorktreeParkingPassTelemetry()
     harness.census = { managers: 49, panes: 60 }
     harness.crumbs.length = 0
+  })
+
+  afterEach(() => {
+    resetTerminalWorktreeParkingPassTelemetry()
+    vi.useRealTimers()
   })
 
   it('summarizes deadline cohorts and vetoes so clock resets and vetoes separate', () => {
@@ -55,6 +61,8 @@ describe('worktree parking pass telemetry', () => {
       ],
       census: harness.census,
       ordinaryParkedCount: 0,
+      parkingEnabled: true,
+      retentionBudgetEnabled: true,
       nowMs
     })
     expect(clockReset.hiddenTracked).toBe(2)
@@ -73,46 +81,111 @@ describe('worktree parking pass telemetry', () => {
           worktreeId: 'b',
           hiddenSinceMs: nowMs - 6 * 60_000,
           parkCooldownUntilMs: nowMs + 1_000
+        }),
+        verdict({
+          worktreeId: 'young',
+          hiddenSinceMs: nowMs - 10_000,
+          hasPendingSpawnWork: true
         })
       ],
       census: harness.census,
       ordinaryParkedCount: 0,
+      parkingEnabled: true,
+      retentionBudgetEnabled: false,
       nowMs
     })
     expect(vetoed.hiddenPastParkDelay).toBe(2)
     expect(vetoed.hiddenPastHotRetain).toBe(2)
     expect(vetoed.hiddenPastRetentionTtl).toBe(1)
-    expect(vetoed.pendingSpawnWork).toBe(1)
-    expect(vetoed.cooldown).toBe(1)
+    expect(vetoed.pastParkDelayPendingSpawnWork).toBe(1)
+    expect(vetoed.pastParkDelayCooldown).toBe(1)
     expect(vetoed.managers).toBe(49)
+    expect(vetoed.parkingEnabled).toBe(true)
+    expect(vetoed.retentionBudgetEnabled).toBe(false)
   })
 
-  it('emits once per verdict shift with interval damping, not per pass', () => {
+  it('keeps veto counts inside the aged cohort', () => {
+    const nowMs = 20 * 60_000
+    const summary = summarizeTerminalWorktreeParkingPass({
+      verdicts: [
+        verdict({
+          worktreeId: 'aged-covered',
+          hiddenSinceMs: 0,
+          ordinaryParkingCovers: true
+        }),
+        verdict({
+          worktreeId: 'young-pending',
+          hiddenSinceMs: nowMs - 10_000,
+          hasPendingSpawnWork: true
+        })
+      ],
+      census: harness.census,
+      ordinaryParkedCount: 0,
+      parkingEnabled: true,
+      retentionBudgetEnabled: true,
+      nowMs
+    })
+
+    expect(summary.hiddenPastParkDelay).toBe(1)
+    expect(summary.pastParkDelayOrdinaryParkingCovers).toBe(1)
+    expect(summary.pastParkDelayPendingSpawnWork).toBe(0)
+  })
+
+  it('queues every pass for main-process coalescing', () => {
     const base = [verdict({ worktreeId: 'a', hiddenSinceMs: 0 })]
-    recordTerminalWorktreeParkingPass({ verdicts: base, ordinaryParkedCount: 0, nowMs: 60_000 })
+    queueTerminalWorktreeParkingPass({
+      verdicts: base,
+      ordinaryParkedCount: 0,
+      parkingEnabled: true,
+      retentionBudgetEnabled: true,
+      nowMs: 60_000
+    })
+    vi.runOnlyPendingTimers()
     expect(harness.crumbs).toHaveLength(1)
     expect(harness.crumbs[0]?.name).toBe('terminal_parking_pass')
     expect(harness.crumbs[0]?.data?.hiddenPastParkDelay).toBe(1)
 
-    // Same cohorts, older age: no re-emit (ages are not part of the key).
-    recordTerminalWorktreeParkingPass({ verdicts: base, ordinaryParkedCount: 0, nowMs: 70_000 })
-    expect(harness.crumbs).toHaveLength(1)
-
-    // A genuine shift inside the damping window stays pending.
     const shifted = [verdict({ worktreeId: 'a', hiddenSinceMs: 0, hasPendingSpawnWork: true })]
-    recordTerminalWorktreeParkingPass({ verdicts: shifted, ordinaryParkedCount: 0, nowMs: 80_000 })
-    expect(harness.crumbs).toHaveLength(1)
-
-    // The pending shift fires once the window opens.
-    recordTerminalWorktreeParkingPass({ verdicts: shifted, ordinaryParkedCount: 0, nowMs: 95_000 })
+    queueTerminalWorktreeParkingPass({
+      verdicts: shifted,
+      ordinaryParkedCount: 0,
+      parkingEnabled: true,
+      retentionBudgetEnabled: true,
+      nowMs: 61_000
+    })
+    vi.runOnlyPendingTimers()
     expect(harness.crumbs).toHaveLength(2)
-    expect(harness.crumbs[1]?.data?.pendingSpawnWork).toBe(1)
+    expect(harness.crumbs[1]?.data?.pastParkDelayPendingSpawnWork).toBe(1)
   })
 
-  it('records the manager census with every emission', () => {
+  it('samples the manager census after the queued pass', () => {
+    queueTerminalWorktreeParkingPass({
+      verdicts: [],
+      ordinaryParkedCount: 0,
+      parkingEnabled: true,
+      retentionBudgetEnabled: true,
+      nowMs: 60_000
+    })
     harness.census = { managers: 7, panes: 9 }
-    recordTerminalWorktreeParkingPass({ verdicts: [], ordinaryParkedCount: 0, nowMs: 60_000 })
+    expect(harness.crumbs).toHaveLength(0)
+
+    vi.runOnlyPendingTimers()
     expect(harness.crumbs[0]?.data?.managers).toBe(7)
     expect(harness.crumbs[0]?.data?.panes).toBe(9)
+  })
+
+  it('cancels a queued sample when the terminal surface unmounts', () => {
+    queueTerminalWorktreeParkingPass({
+      verdicts: [],
+      ordinaryParkedCount: 0,
+      parkingEnabled: true,
+      retentionBudgetEnabled: true,
+      nowMs: 60_000
+    })
+
+    resetTerminalWorktreeParkingPassTelemetry()
+    vi.runOnlyPendingTimers()
+
+    expect(harness.crumbs).toHaveLength(0)
   })
 })

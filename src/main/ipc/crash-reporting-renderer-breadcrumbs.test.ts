@@ -255,6 +255,21 @@ describe('renderer breadcrumb IPC routing', () => {
     }
   })
 
+  it('coalesces parking passes by name so the store can retain the latest sample', () => {
+    emitRendererBreadcrumb({
+      name: 'terminal_parking_pass',
+      data: { managers: 49, panes: 60, sampledAtMs: 123 }
+    })
+
+    expect(recordCrashBreadcrumbMock).not.toHaveBeenCalled()
+    expect(recordCoalescedCrashBreadcrumbMock).toHaveBeenCalledWith({
+      name: 'terminal_parking_pass',
+      data: { managers: 49, panes: 60, sampledAtMs: 123 },
+      coalesceKey: 'terminal_parking_pass',
+      minIntervalMs: 30_000
+    })
+  })
+
   // Why: `burst` means damping engaged a commit short of React #185 while
   // `window` is slow benign churn. A shared key would drop the near-crash
   // signal into the slow-churn slot.
