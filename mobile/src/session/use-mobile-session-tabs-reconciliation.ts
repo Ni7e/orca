@@ -22,6 +22,7 @@ type Params<Result, Tab> = {
   ) => void
   fetchTerminals: () => Promise<void>
   hasRecoveryNeed: () => boolean
+  pendingTerminalRecoveryContextKey?: string | null
   getPendingTerminalRecoveryContextKey?: () => string | null
   onPendingTerminalRecoveryParked?: (contextKey: string | null) => void
   getApplicationRevision?: () => number
@@ -48,6 +49,7 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
   consumeAcceptedSessionTabs,
   fetchTerminals,
   hasRecoveryNeed,
+  pendingTerminalRecoveryContextKey,
   getPendingTerminalRecoveryContextKey,
   onPendingTerminalRecoveryParked,
   getApplicationRevision,
@@ -79,6 +81,10 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
     pendingTerminalRecoveryBudget.reset()
     onPendingTerminalRecoveryParkedRef.current?.(null)
   }, [pendingTerminalRecoveryBudget])
+  useEffect(() => {
+    pendingTerminalRecoveryBudget.observeContext(pendingTerminalRecoveryContextKey ?? null)
+    onPendingTerminalRecoveryParkedRef.current?.(null)
+  }, [pendingTerminalRecoveryBudget, pendingTerminalRecoveryContextKey])
   const controller = useMemo(
     () =>
       client

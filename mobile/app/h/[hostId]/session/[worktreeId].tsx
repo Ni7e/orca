@@ -2301,6 +2301,10 @@ export default function SessionScreen() {
       ),
     []
   )
+  const pendingTerminalRecoveryContextKey = getPendingTerminalHandleRecoveryContextKey(
+    sessionTabs,
+    activeSessionTabId
+  )
   const getSessionTabsApplicationRevision = useCallback(
     () => appliedSessionTabsRevisionRef.current,
     []
@@ -2322,6 +2326,7 @@ export default function SessionScreen() {
     consumeAcceptedSessionTabs,
     fetchTerminals,
     hasRecoveryNeed: hasSessionTabsRecoveryNeed,
+    pendingTerminalRecoveryContextKey,
     getPendingTerminalRecoveryContextKey,
     onPendingTerminalRecoveryParked: setParkedPendingTerminalContext,
     getApplicationRevision: getSessionTabsApplicationRevision,

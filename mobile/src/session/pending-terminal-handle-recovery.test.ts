@@ -188,6 +188,26 @@ describe('pending-handle recovery through MobileSessionTabsStreamHealth', () => 
     expect(harness.sendRequest).toHaveBeenCalledTimes(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS)
   })
 
+  it('charges the budget only when a slow poll starts a request', async () => {
+    const harness = makeHarness()
+    await driveToLiveStream(harness, null)
+
+    for (let attempt = 0; attempt < PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS; attempt += 1) {
+      const request = harness.controller.poll()
+      expect(request).not.toBeNull()
+      for (let joinedTick = 0; joinedTick < 5; joinedTick += 1) {
+        expect(harness.controller.poll()).toBe(request)
+      }
+      await settle()
+      expect(harness.sendRequest).toHaveBeenCalledTimes(attempt + 1)
+      harness.resolveNext(snapshot(null))
+      await request
+    }
+
+    expect(harness.controller.poll()).toBeNull()
+    expect(harness.sendRequest).toHaveBeenCalledTimes(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS)
+  })
+
   it('stops polling once a fresh snapshot carries the handle', async () => {
     const harness = makeHarness()
     await driveToLiveStream(harness, null)

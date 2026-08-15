@@ -87,6 +87,7 @@ function makeHarness() {
       consumeAcceptedSessionTabs,
       fetchTerminals,
       hasRecoveryNeed,
+      pendingTerminalRecoveryContextKey: contextKey,
       getPendingTerminalRecoveryContextKey,
       onPendingTerminalRecoveryParked
     })
@@ -190,6 +191,26 @@ describe('bounded pending-handle reconciliation cadence', () => {
     harness.setContextKey('terminal-b')
     await advance(2000)
     expect(harness.requestTimes).toHaveLength(afterActiveTabChange + 2)
+  })
+
+  it('resets when the active tab changes away and back between poll ticks', async () => {
+    const harness = makeHarness()
+    await mount(harness)
+    await advance(12_000)
+
+    harness.setContextKey(null)
+    await act(async () => {
+      renderer?.update(createElement(harness.Harness))
+      await flush()
+    })
+    harness.setContextKey('terminal-a')
+    await act(async () => {
+      renderer?.update(createElement(harness.Harness))
+      await flush()
+    })
+    await advance(2000)
+
+    expect(harness.requestTimes).toHaveLength(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS + 1)
   })
 
   it('resets after foregrounding, reconnecting, and explicit retry', async () => {
