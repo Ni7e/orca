@@ -610,7 +610,7 @@ describe('recordProcessGoneCrash whole-process-tree kills', () => {
     nowSpy.mockReturnValue(1_785_708_578_737)
     recordProcessGoneCrash({ record } as never, gpuKill, dedupe)
     nowSpy.mockReturnValue(1_785_708_578_746)
-    recordProcessGoneCrash({ record } as never, rendererKill, dedupe)
+    recordProcessGoneCrash({ record, attachDetails } as never, rendererKill, dedupe, noMinidump)
 
     expect(record).not.toHaveBeenCalled()
     expect(getCrashBreadcrumbSnapshot()).toEqual(
@@ -631,7 +631,7 @@ describe('recordProcessGoneCrash whole-process-tree kills', () => {
     vi.useFakeTimers()
     vi.setSystemTime(1_785_818_589_464)
 
-    recordProcessGoneCrash({ record } as never, rendererKill, dedupe)
+    recordProcessGoneCrash({ record, attachDetails } as never, rendererKill, dedupe, noMinidump)
     vi.advanceTimersByTime(5)
     recordProcessGoneCrash({ record } as never, networkServiceKill, dedupe)
     vi.advanceTimersByTime(36)
@@ -676,12 +676,12 @@ describe('recordProcessGoneCrash whole-process-tree kills', () => {
     vi.setSystemTime(1_785_818_589_464)
 
     recordProcessGoneCrash({ record } as never, gpuKill, dedupe)
-    recordProcessGoneCrash({ record } as never, rendererKill, dedupe)
+    recordProcessGoneCrash({ record, attachDetails } as never, rendererKill, dedupe, noMinidump)
     await vi.advanceTimersByTimeAsync(250)
     expect(record).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(3_000)
-    recordProcessGoneCrash({ record } as never, rendererKill, dedupe)
+    recordProcessGoneCrash({ record, attachDetails } as never, rendererKill, dedupe, noMinidump)
     await vi.advanceTimersByTimeAsync(250)
 
     expect(record).toHaveBeenCalledOnce()
@@ -752,9 +752,24 @@ describe('recordProcessGoneCrash whole-process-tree kills', () => {
     const dedupe = new ProcessGoneDedupe()
     vi.useFakeTimers()
 
-    recordProcessGoneCrash({ record } as never, rendererKill, dedupe)
+    recordProcessGoneCrash({ record, attachDetails } as never, rendererKill, dedupe, noMinidump)
     await vi.advanceTimersByTimeAsync(251)
     recordProcessGoneCrash({ record } as never, gpuKill, dedupe)
+
+    expect(record).toHaveBeenCalledOnce()
+  })
+
+  it('files when an overdue settle callback runs after a late sibling event', async () => {
+    const record = vi.fn().mockResolvedValue({ id: 'report-1' })
+    const dedupe = new ProcessGoneDedupe()
+    vi.useFakeTimers()
+    let monotonicNow = 1_000
+    vi.spyOn(performance, 'now').mockImplementation(() => monotonicNow)
+
+    recordProcessGoneCrash({ record, attachDetails } as never, rendererKill, dedupe, noMinidump)
+    monotonicNow += 251
+    recordProcessGoneCrash({ record } as never, gpuKill, dedupe)
+    await vi.advanceTimersByTimeAsync(250)
 
     expect(record).toHaveBeenCalledOnce()
   })
@@ -823,7 +838,7 @@ describe('recordProcessGoneCrash whole-process-tree kills', () => {
     const record = vi.fn().mockResolvedValue({ id: 'report-1' })
 
     recordProcessGoneCrash(
-      { record } as never,
+      { record, attachDetails } as never,
       event({
         source: 'child',
         processType: 'Utility',
@@ -831,7 +846,8 @@ describe('recordProcessGoneCrash whole-process-tree kills', () => {
         exitCode: 1,
         details: { serviceName: 'chrome.mojom.UtilWin', type: 'Utility' }
       }),
-      new ProcessGoneDedupe()
+      new ProcessGoneDedupe(),
+      noMinidump
     )
 
     await vi.waitFor(() => expect(record).toHaveBeenCalledOnce())
@@ -845,10 +861,20 @@ describe('recordProcessGoneCrash whole-process-tree kills', () => {
     vi.useFakeTimers()
     vi.setSystemTime(1_785_818_589_464)
 
-    recordProcessGoneCrash({ record } as never, rendererKill, new ProcessGoneDedupe())
+    recordProcessGoneCrash(
+      { record, attachDetails } as never,
+      rendererKill,
+      new ProcessGoneDedupe(),
+      noMinidump
+    )
     expect(sink.flushMock).toHaveBeenCalledOnce()
     await vi.advanceTimersByTimeAsync(50)
-    recordProcessGoneCrash({ record } as never, rendererKill, new ProcessGoneDedupe())
+    recordProcessGoneCrash(
+      { record, attachDetails } as never,
+      rendererKill,
+      new ProcessGoneDedupe(),
+      noMinidump
+    )
     expect(sink.flushMock).toHaveBeenCalledOnce()
     await vi.advanceTimersByTimeAsync(250)
 
@@ -869,7 +895,7 @@ describe('recordProcessGoneCrash whole-process-tree kills', () => {
 
     recordProcessGoneCrash({ record } as never, gpuKill, dedupe)
     await vi.advanceTimersByTimeAsync(3_000)
-    recordProcessGoneCrash({ record } as never, rendererKill, dedupe)
+    recordProcessGoneCrash({ record, attachDetails } as never, rendererKill, dedupe, noMinidump)
     await vi.advanceTimersByTimeAsync(250)
     recordProcessGoneCrash({ record } as never, gpuKill, dedupe)
 
