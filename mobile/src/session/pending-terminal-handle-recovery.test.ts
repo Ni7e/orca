@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcResponse } from '../transport/types'
 import type { MobileSessionTab, SessionTabsResult } from './mobile-session-route-types'
-import { hasPendingTerminalHandleRecoveryNeed } from './pending-terminal-handle-recovery'
+import {
+  getPendingTerminalHandleRecoveryContextKey,
+  hasPendingTerminalHandleRecoveryNeed,
+  PendingTerminalHandleRecoveryBudget,
+  PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS
+} from './pending-terminal-handle-recovery'
 import {
   MobileSessionTabsStreamHealth,
   type SessionTabsApplyOutcome
@@ -64,6 +69,29 @@ describe('hasPendingTerminalHandleRecoveryNeed', () => {
   })
 })
 
+describe('PendingTerminalHandleRecoveryBudget', () => {
+  it('parks after the bounded attempt window and resets for a new terminal', () => {
+    const budget = new PendingTerminalHandleRecoveryBudget()
+    for (let attempt = 1; attempt <= PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS; attempt += 1) {
+      expect(budget.take('terminal-a')).toEqual({
+        allowed: true,
+        parked: attempt === PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS
+      })
+    }
+    expect(budget.take('terminal-a')).toEqual({ allowed: false, parked: true })
+    expect(budget.take('terminal-b')).toEqual({ allowed: true, parked: false })
+  })
+
+  it('resets the current terminal budget explicitly', () => {
+    const budget = new PendingTerminalHandleRecoveryBudget()
+    for (let attempt = 0; attempt < PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS; attempt += 1) {
+      budget.take('terminal-a')
+    }
+    budget.reset()
+    expect(budget.take('terminal-a')).toEqual({ allowed: true, parked: false })
+  })
+})
+
 /**
  * STA-4256: the phone rendered its spinner forever because a `live` tabs stream
  * parks `poll()`, so a host that mints the handle without republishing was never
@@ -82,6 +110,7 @@ describe('pending-handle recovery through MobileSessionTabsStreamHealth', () => 
     const client = { sendRequest, getGeneration: () => 1 } as unknown as RpcClient
     let tabs: MobileSessionTab[] = []
     let activeTabId: string | null = null
+    const recoveryBudget = new PendingTerminalHandleRecoveryBudget()
     const controller = new MobileSessionTabsStreamHealth<SessionTabsResult, MobileSessionTab>({
       client,
       scope: 'id:repo::worktree',
@@ -91,7 +120,9 @@ describe('pending-handle recovery through MobileSessionTabsStreamHealth', () => 
         return { accepted: true, effectiveTabs: result.tabs }
       },
       consumeAccepted: () => {},
-      hasRecoveryNeed: () => hasPendingTerminalHandleRecoveryNeed(tabs, activeTabId)
+      hasRecoveryNeed: () => hasPendingTerminalHandleRecoveryNeed(tabs, activeTabId),
+      allowRecoveryPoll: () =>
+        recoveryBudget.take(getPendingTerminalHandleRecoveryContextKey(tabs, activeTabId)).allowed
     })
     return {
       controller,
@@ -137,6 +168,24 @@ describe('pending-handle recovery through MobileSessionTabsStreamHealth', () => 
     expect(harness.sendRequest).toHaveBeenCalledWith('session.tabs.list', {
       worktree: 'id:repo::worktree'
     })
+  })
+
+  it('parks the live poll after five pending-handle lists', async () => {
+    const harness = makeHarness()
+    await driveToLiveStream(harness, null)
+
+    for (let attempt = 0; attempt < PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS; attempt += 1) {
+      const request = harness.controller.poll()
+      expect(request).not.toBeNull()
+      await settle()
+      harness.resolveNext(snapshot(null))
+      await request
+    }
+
+    expect(harness.sendRequest).toHaveBeenCalledTimes(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS)
+    expect(harness.controller.poll()).toBeNull()
+    await settle()
+    expect(harness.sendRequest).toHaveBeenCalledTimes(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS)
   })
 
   it('stops polling once a fresh snapshot carries the handle', async () => {

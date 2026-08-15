@@ -31,6 +31,7 @@ type ControllerOptions<Result, Tab> = {
     source: SessionTabsStreamSource
   ) => void
   hasRecoveryNeed: () => boolean
+  allowRecoveryPoll?: () => boolean
   getApplicationRevision?: () => number
   onFetchStarted?: () => void
   onFetchSucceeded?: (result: Result) => void
@@ -86,13 +87,17 @@ export class MobileSessionTabsStreamHealth<Result, Tab> {
 
   poll(): Promise<void> | null {
     this.syncGeneration()
-    if (
-      !this.reconciliationActive ||
-      (this.health === 'live' &&
-        !this.options.hasRecoveryNeed() &&
-        this.requirementRevision <= this.satisfiedRevision)
-    ) {
+    if (!this.reconciliationActive) {
       return null
+    }
+    if (this.health === 'live') {
+      const recoveryNeeded = this.options.hasRecoveryNeed()
+      if (recoveryNeeded && this.options.allowRecoveryPoll?.() === false) {
+        return null
+      }
+      if (!recoveryNeeded && this.requirementRevision <= this.satisfiedRevision) {
+        return null
+      }
     }
     return this.ensureReconciliation()
   }

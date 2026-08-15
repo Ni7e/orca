@@ -1,5 +1,52 @@
 import type { MobileSessionTab } from './mobile-session-route-types'
 
+export const PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS = 5
+
+export type PendingTerminalHandleRecoveryAttempt = {
+  allowed: boolean
+  parked: boolean
+}
+
+export class PendingTerminalHandleRecoveryBudget {
+  private contextKey: string | null = null
+  private remaining = PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS
+
+  take(contextKey: string | null): PendingTerminalHandleRecoveryAttempt {
+    if (contextKey === null) {
+      this.contextKey = null
+      return { allowed: false, parked: false }
+    }
+    if (contextKey !== this.contextKey) {
+      this.contextKey = contextKey
+      this.remaining = PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS
+    }
+    if (this.remaining === 0) {
+      return { allowed: false, parked: true }
+    }
+    this.remaining -= 1
+    return { allowed: true, parked: this.remaining === 0 }
+  }
+
+  reset(): void {
+    this.contextKey = null
+    this.remaining = PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS
+  }
+}
+
+export function getPendingTerminalHandleRecoveryContextKey(
+  tabs: readonly MobileSessionTab[],
+  activeTabId: string | null
+): string | null {
+  if (activeTabId === null) {
+    return null
+  }
+  const active = tabs.find((tab) => tab.id === activeTabId)
+  if (active?.type !== 'terminal' || typeof active.terminal === 'string') {
+    return null
+  }
+  return `${active.id}:${active.parentTabId}:${active.leafId ?? ''}`
+}
+
 /**
  * Whether the tab the user is looking at is a terminal the host published
  * without a PTY handle (`status: 'pending-handle'`). The session screen renders
@@ -16,9 +63,5 @@ export function hasPendingTerminalHandleRecoveryNeed(
   tabs: readonly MobileSessionTab[],
   activeTabId: string | null
 ): boolean {
-  if (activeTabId === null) {
-    return false
-  }
-  const active = tabs.find((tab) => tab.id === activeTabId)
-  return active?.type === 'terminal' && typeof active.terminal !== 'string'
+  return getPendingTerminalHandleRecoveryContextKey(tabs, activeTabId) !== null
 }
