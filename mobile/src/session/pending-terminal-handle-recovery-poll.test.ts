@@ -203,14 +203,32 @@ describe('bounded pending-handle reconciliation cadence', () => {
       renderer?.update(createElement(harness.Harness))
       await flush()
     })
+    expect(harness.parkedContexts.at(-1)).toBeNull()
     harness.setContextKey('terminal-a')
     await act(async () => {
       renderer?.update(createElement(harness.Harness))
       await flush()
     })
+    expect(harness.parkedContexts.at(-1)).toBeNull()
     await advance(2000)
 
     expect(harness.requestTimes).toHaveLength(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS + 1)
+  })
+
+  it('keeps the parked state across unrelated rerenders', async () => {
+    const harness = makeHarness()
+    await mount(harness)
+    await advance(12_000)
+    expect(harness.parkedContexts.at(-1)).toBe('terminal-a')
+
+    await act(async () => {
+      renderer?.update(createElement(harness.Harness))
+      await flush()
+    })
+
+    expect(harness.parkedContexts.at(-1)).toBe('terminal-a')
+    await advance(2000)
+    expect(harness.requestTimes).toHaveLength(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS)
   })
 
   it('resets after foregrounding, reconnecting, and explicit retry', async () => {
