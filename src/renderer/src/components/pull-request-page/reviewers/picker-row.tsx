@@ -10,6 +10,7 @@ export function ReviewerPickerRow({
   active,
   selected,
   activeIndex,
+  disabled,
   onHover,
   onRequest
 }: {
@@ -18,6 +19,7 @@ export function ReviewerPickerRow({
   active: boolean
   selected: boolean
   activeIndex: number
+  disabled: boolean
   onHover: (index: number) => void
   onRequest: (reviewer: GitHubAssignableUser) => void
 }): React.JSX.Element {
@@ -25,6 +27,7 @@ export function ReviewerPickerRow({
     <button
       key={`${suggested ? 'suggested' : 'reviewer'}:${reviewer.login}`}
       type="button"
+      disabled={disabled}
       aria-label={
         selected
           ? translate(
@@ -38,7 +41,7 @@ export function ReviewerPickerRow({
       }
       aria-pressed={selected}
       className={cn(
-        'flex min-h-10 w-full items-center gap-2 border-b border-border/70 px-3 py-2 text-left text-[13px] outline-none last:border-b-0 hover:bg-accent/70 focus-visible:bg-accent focus-visible:text-accent-foreground',
+        'flex min-h-10 w-full items-center gap-2 border-b border-border/70 px-3 py-2 text-left text-[13px] outline-none last:border-b-0 hover:bg-accent/70 focus-visible:bg-accent focus-visible:text-accent-foreground disabled:pointer-events-none disabled:opacity-50',
         active && 'bg-accent text-accent-foreground',
         selected && 'font-medium'
       )}

@@ -17,7 +17,8 @@ import type { TaskSourceContext } from '../../../../../shared/task-source-contex
 import type { GlobalSettings } from '../../../../../shared/global-settings-types'
 
 type ReviewerRequestActionsArgs = {
-  submitting: boolean
+  // Why: a ref, not the render-time `submitting` value, so two clicks in one tick can't both pass the guard.
+  submittingRef: { current: boolean }
   setSubmitting: (value: boolean) => void
   reviewerInput: string
   setReviewerInput: (value: string) => void
@@ -47,7 +48,7 @@ export function createReviewerRequestActions(args: ReviewerRequestActionsArgs): 
   requestReviewer: (reviewer: GitHubAssignableUser) => Promise<void>
 } {
   const handleRequestReview = async (requestedLogins?: string[]): Promise<void> => {
-    if (args.submitting) {
+    if (args.submittingRef.current) {
       return
     }
     const logins = normalizeGitHubReviewerLogins(
@@ -77,6 +78,7 @@ export function createReviewerRequestActions(args: ReviewerRequestActionsArgs): 
       )
       return
     }
+    args.submittingRef.current = true
     args.setSubmitting(true)
     try {
       const runtimeRepo = getGitHubRuntimeRepoId(args.sourceContext, args.item.repoId)
@@ -146,6 +148,7 @@ export function createReviewerRequestActions(args: ReviewerRequestActionsArgs): 
         )
       }
     } finally {
+      args.submittingRef.current = false
       if (args.reviewerPanelMountedRef.current) {
         args.setSubmitting(false)
       }
@@ -153,7 +156,7 @@ export function createReviewerRequestActions(args: ReviewerRequestActionsArgs): 
   }
 
   const handleRemoveReviewers = async (reviewersToRemove: string[]): Promise<void> => {
-    if (args.submitting) {
+    if (args.submittingRef.current) {
       return
     }
     const selected = new Set(
@@ -175,6 +178,7 @@ export function createReviewerRequestActions(args: ReviewerRequestActionsArgs): 
       )
       return
     }
+    args.submittingRef.current = true
     args.setSubmitting(true)
     try {
       const runtimeRepo = getGitHubRuntimeRepoId(args.sourceContext, args.item.repoId)
@@ -243,6 +247,7 @@ export function createReviewerRequestActions(args: ReviewerRequestActionsArgs): 
         )
       }
     } finally {
+      args.submittingRef.current = false
       if (args.reviewerPanelMountedRef.current) {
         args.setSubmitting(false)
       }

@@ -15,6 +15,7 @@ export async function syncPullRequestFileViewed(args: {
   canUseDetailsRepoContext: boolean
   details: GitHubWorkItemDetails | null
   workItem: GitHubWorkItem | null
+  effectiveRepoId: string | null
   path: string
   viewed: boolean
   detailsCacheKey: string | null
@@ -42,9 +43,21 @@ export async function syncPullRequestFileViewed(args: {
   const previousState = args.detailsCacheKey
     ? patchCachedPRFileViewedState(args.detailsCacheKey, args.path, nextState)
     : undefined
+  const rollbackWithError = (): false => {
+    if (args.detailsCacheKey && previousState) {
+      patchCachedPRFileViewedState(args.detailsCacheKey, args.path, previousState)
+    }
+    toast.error(
+      translate(
+        'auto.components.PullRequestPage.5a01ca7253',
+        'Failed to sync viewed state with GitHub.'
+      )
+    )
+    return false
+  }
   try {
     const ok = await setPRFileViewedForRepo({
-      repoId: args.workItem.repoId,
+      repoId: args.effectiveRepoId ?? args.workItem.repoId,
       repoPath: args.repoPath ?? '',
       sourceContext: args.sourceContext,
       prNumber: args.workItem.number,
@@ -54,18 +67,11 @@ export async function syncPullRequestFileViewed(args: {
       viewed: args.viewed
     })
     if (!ok) {
-      if (args.detailsCacheKey && previousState) {
-        patchCachedPRFileViewedState(args.detailsCacheKey, args.path, previousState)
-      }
-      toast.error(
-        translate(
-          'auto.components.PullRequestPage.5a01ca7253',
-          'Failed to sync viewed state with GitHub.'
-        )
-      )
-      return false
+      return rollbackWithError()
     }
     return true
+  } catch {
+    return rollbackWithError()
   } finally {
     args.setPendingViewedPaths((prev) => {
       const next = new Set(prev)

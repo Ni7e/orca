@@ -28,18 +28,28 @@ export async function addPullRequestLineComment(args: {
     )
     return false
   }
-  const result = await addPRReviewCommentForRepo({
-    repoPath: args.repoPath,
-    repoId: args.repoId,
-    sourceContext: args.sourceContext,
-    prNumber: args.prNumber,
-    prRepo: args.prRepo,
-    commitId: args.headSha,
-    path: args.section.path,
-    line: args.lineNumber,
-    startLine: args.startLine,
-    body: args.body
-  })
+  let result: Awaited<ReturnType<typeof addPRReviewCommentForRepo>>
+  try {
+    result = await addPRReviewCommentForRepo({
+      repoPath: args.repoPath,
+      repoId: args.repoId,
+      sourceContext: args.sourceContext,
+      prNumber: args.prNumber,
+      prRepo: args.prRepo,
+      commitId: args.headSha,
+      path: args.section.path,
+      line: args.lineNumber,
+      startLine: args.startLine,
+      body: args.body
+    })
+  } catch (error) {
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : translate('auto.components.PullRequestPage.19628e058d', 'Failed to add review comment.')
+    )
+    return false
+  }
   if (!result.ok) {
     toast.error(
       result.error ||

@@ -1674,7 +1674,10 @@
         "checkActionRequiredHint": "This check needs a manual action on GitHub (for example, approving the workflow run) before merging is unblocked.",
         "6b1d5ee3e4": "No inline details are available for this check.",
         "e04c027d98": "Failed to load check details.",
-        "5df7c41d2a": "Retry"
+        "5df7c41d2a": "Retry",
+        "77482513f8": "Close",
+        "2f5195c6a0": "Reopen",
+        "4b8ae7303f": "Failed to load diff."
       },
       "QuickOpen": {
         "1dbd3f59ff": "Move",

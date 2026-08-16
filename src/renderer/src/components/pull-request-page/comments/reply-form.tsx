@@ -57,6 +57,14 @@ export function CommentReplyForm({
       if (ok) {
         setBody('')
       }
+    } catch (error) {
+      if (mountedRef.current) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : translate('auto.components.PullRequestPage.5821aab360', 'Failed to post reply.')
+        )
+      }
     } finally {
       if (mountedRef.current) {
         setSubmitting(false)

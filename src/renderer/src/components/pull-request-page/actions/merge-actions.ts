@@ -40,7 +40,10 @@ export async function changePullRequestState(args: {
   if (!args.canMutateState || args.statePending) {
     return
   }
-  const label = args.nextState === 'closed' ? 'Close' : 'Reopen'
+  const label =
+    args.nextState === 'closed'
+      ? translate('auto.components.PullRequestPage.77482513f8', 'Close')
+      : translate('auto.components.PullRequestPage.2f5195c6a0', 'Reopen')
   const confirmed = await args.confirm({
     title: translate('auto.components.PullRequestPage.eec3706a6a', '{{value0}} PR #{{value1}}?', {
       value0: label,

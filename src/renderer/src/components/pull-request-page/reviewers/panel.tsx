@@ -66,6 +66,7 @@ export function PRReviewersPanel({
         : repoOwnerSettings,
     [repoOwnerSettings, sourceContext]
   )
+  const submittingRef = useRef(false)
   const reviewerInputRef = useRef<HTMLInputElement | null>(null)
   const reviewerInputFocusFrameRef = useRef<number | null>(null)
   const reviewerPanelMountedRef = useRef(true)
@@ -243,7 +244,7 @@ export function PRReviewersPanel({
 
   const { handleRequestReview, handleRemoveReviewers, requestReviewer } =
     createReviewerRequestActions({
-      submitting,
+      submittingRef,
       setSubmitting,
       reviewerInput,
       setReviewerInput,

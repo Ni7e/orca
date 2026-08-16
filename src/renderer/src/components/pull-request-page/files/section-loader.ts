@@ -126,13 +126,17 @@ export function usePRFileSectionLoader(args: {
             modifiedIsBinary: false
           } as GitDiffResult,
           resultContents: undefined,
-          error: error instanceof Error ? error.message : 'Failed to load diff.'
+          error:
+            error instanceof Error
+              ? error.message
+              : translate('auto.components.PullRequestPage.4b8ae7303f', 'Failed to load diff.')
         }))
         .then(({ result, resultContents, error }) => {
-          loadingIndicesRef.current.delete(index)
+          // Why: a generation bump already cleared the set, so a stale load must not evict the new entry.
           if (generationRef.current !== generation) {
             return
           }
+          loadingIndicesRef.current.delete(index)
           const largeDiffRenderLimit =
             !error && result.kind === 'text' && resultContents
               ? getPRFileContentsRenderLimit(resultContents)

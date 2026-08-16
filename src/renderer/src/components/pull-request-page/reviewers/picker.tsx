@@ -132,6 +132,7 @@ export function ReviewerPicker({
                       active={actionableReviewerRows[activeReviewerIndex]?.login === reviewer.login}
                       selected={selectedReviewerLogins.has(reviewer.login.toLowerCase())}
                       activeIndex={index}
+                      disabled={submitting || !canRequestReview}
                       onHover={onActiveIndexChange}
                       onRequest={onRequestReviewer}
                     />
@@ -150,6 +151,7 @@ export function ReviewerPicker({
                     active={actionableReviewerRows[activeReviewerIndex]?.login === reviewer.login}
                     selected={selectedReviewerLogins.has(reviewer.login.toLowerCase())}
                     activeIndex={suggestedReviewerRows.length + index}
+                    disabled={submitting || !canRequestReview}
                     onHover={onActiveIndexChange}
                     onRequest={onRequestReviewer}
                   />

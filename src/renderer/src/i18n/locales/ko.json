@@ -1539,7 +1539,10 @@
         "dd5d9a4f17": "{{value0}}에 업데이트됨",
         "71a3c0f9d2": "워크스페이스 시작",
         "filesUnavailable": "변경된 파일을 불러오지 못했습니다.",
-        "filesRetry": "Retry"
+        "filesRetry": "Retry",
+        "77482513f8": "닫기",
+        "2f5195c6a0": "다시 열기",
+        "4b8ae7303f": "차이를 불러오지 못했습니다."
       },
       "QuickOpen": {
         "1dbd3f59ff": "이동",

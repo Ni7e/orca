@@ -56,6 +56,10 @@ export function usePRFilesDiffViewPersistence(args: {
     }
 
     const updateCachedScrollPosition = (): void => {
+      // Why: mid-restore scrollTop is a clamped intermediate, so caching it would lose the real target.
+      if (args.pendingRestoreScrollTopRef.current !== null) {
+        return
+      }
       const existing = prFilesDiffViewStateCache.get(args.viewStateKey)
       setWithLRU(prFilesDiffScrollTopCache, args.viewStateKey, container.scrollTop)
       if (!existing || existing.entrySignature !== args.entrySignature) {
@@ -72,7 +76,12 @@ export function usePRFilesDiffViewPersistence(args: {
       updateCachedScrollPosition()
       container.removeEventListener('scroll', updateCachedScrollPosition)
     }
-  }, [args.entrySignature, args.scrollContainerRef, args.viewStateKey])
+  }, [
+    args.entrySignature,
+    args.pendingRestoreScrollTopRef,
+    args.scrollContainerRef,
+    args.viewStateKey
+  ])
 
   useLayoutEffect(() => {
     const container = args.scrollContainerRef.current
@@ -93,9 +102,10 @@ export function usePRFilesDiffViewPersistence(args: {
       const maxScrollTop = Math.max(0, liveContainer.scrollHeight - liveContainer.clientHeight)
       const nextScrollTop = Math.min(liveTarget, maxScrollTop)
       liveContainer.scrollTop = nextScrollTop
-      setWithLRU(prFilesDiffScrollTopCache, args.viewStateKey, nextScrollTop)
 
+      // Why: only cache once the restore lands; an intermediate clamp would overwrite the real target.
       if (Math.abs(liveContainer.scrollTop - liveTarget) <= 1 || maxScrollTop >= liveTarget) {
+        setWithLRU(prFilesDiffScrollTopCache, args.viewStateKey, nextScrollTop)
         args.pendingRestoreScrollTopRef.current = null
         return
       }
@@ -103,7 +113,10 @@ export function usePRFilesDiffViewPersistence(args: {
       attempts += 1
       if (attempts < 30) {
         frameId = window.requestAnimationFrame(restoreScrollPosition)
+        return
       }
+      // Why: give up rather than block scroll caching forever when the content never grows enough.
+      args.pendingRestoreScrollTopRef.current = null
     }
 
     restoreScrollPosition()
