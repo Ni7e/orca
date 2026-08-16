@@ -38,10 +38,10 @@ describe('task drawer source boundaries', () => {
     expect(commentUpdate).toContain('sourceContext: args.sourceContext')
     expect(editSection).toContain('sourceContext,')
     expect(editSection).toContain(
-      'patchWorkItem(item.id, { state: newState }, item.repoId, { sourceContext })'
+      'patchWorkItem(itemId, { state: newState }, itemRepoId, { sourceContext })'
     )
     expect(editSection).toContain(
-      'patchWorkItem(item.id, { labels: newLabels }, item.repoId, { sourceContext })'
+      'patchWorkItem(itemId, { labels: newLabels }, itemRepoId, { sourceContext })'
     )
   })
 

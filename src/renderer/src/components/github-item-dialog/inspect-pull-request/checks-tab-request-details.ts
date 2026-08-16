@@ -32,7 +32,7 @@ export function requestGitHubCheckDetails(
           { kind: 'environment', environmentId: ctx.runtimeHost.environmentId },
           'github.prCheckDetails',
           {
-            repo: getGitHubRuntimeRepoId(ctx.sourceContext, ctx.repoId ?? ctx.item.repoId),
+            repo: getGitHubRuntimeRepoId(ctx.sourceContext, ctx.repoId ?? ctx.itemRepoId),
             checkRunId: check.checkRunId,
             workflowRunId: check.workflowRunId,
             checkName: check.name,

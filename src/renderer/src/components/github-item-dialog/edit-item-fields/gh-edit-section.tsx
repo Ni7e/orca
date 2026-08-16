@@ -200,7 +200,9 @@ export function GHEditSection({
         newState,
         closeAction,
         localState,
-        item,
+        itemId: item.id,
+        itemNumber: item.number,
+        itemRepoId: item.repoId,
         repoPath,
         sourceContext,
         projectOrigin,
@@ -212,7 +214,9 @@ export function GHEditSection({
       })
     },
     [
-      item,
+      item.id,
+      item.number,
+      item.repoId,
       localState,
       repoPath,
       sourceContext,
@@ -262,7 +266,9 @@ export function GHEditSection({
       runGHEditLabelToggle({
         label,
         localLabels,
-        item,
+        itemId: item.id,
+        itemNumber: item.number,
+        itemRepoId: item.repoId,
         repoPath,
         sourceContext,
         projectOrigin,
@@ -274,7 +280,9 @@ export function GHEditSection({
       })
     },
     [
-      item,
+      item.id,
+      item.number,
+      item.repoId,
       localLabels,
       repoPath,
       sourceContext,
@@ -294,7 +302,8 @@ export function GHEditSection({
         localAssignees,
         assigneesItemKey,
         editedAssigneesItemKeyRef,
-        item,
+        itemNumber: item.number,
+        itemRepoId: item.repoId,
         repoPath,
         sourceContext,
         projectOrigin,
@@ -305,7 +314,8 @@ export function GHEditSection({
       })
     },
     [
-      item,
+      item.number,
+      item.repoId,
       assigneesItemKey,
       repoPath,
       sourceContext,

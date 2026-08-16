@@ -23,7 +23,8 @@ export type GHEditProjectRowPatch = {
 export type GHEditMutationRun = ReturnType<typeof useImmediateMutation>['run']
 
 type GHEditMutationBase = {
-  item: GitHubWorkItem
+  itemNumber: GitHubWorkItem['number']
+  itemRepoId: GitHubWorkItem['repoId']
   repoPath: string | null
   sourceContext?: TaskSourceContext | null
   projectOrigin: GitHubItemDialogProjectOrigin | undefined
@@ -36,7 +37,9 @@ export function runGHEditStateChange({
   newState,
   closeAction,
   localState,
-  item,
+  itemId,
+  itemNumber,
+  itemRepoId,
   repoPath,
   sourceContext,
   projectOrigin,
@@ -46,6 +49,7 @@ export function runGHEditStateChange({
   patchProjectRowIfNeeded,
   onMutated
 }: GHEditMutationBase & {
+  itemId: GitHubWorkItem['id']
   newState: 'open' | 'closed'
   closeAction?: TaskPageGitHubCloseAction
   localState: GitHubWorkItem['state']
@@ -67,11 +71,11 @@ export function runGHEditStateChange({
   void run('state', {
     mutate: () =>
       runIssueUpdate({
-        repoId: item.repoId,
+        repoId: itemRepoId,
         repoPath,
         sourceContext,
         projectOrigin,
-        number: item.number,
+        number: itemNumber,
         updates:
           newState === 'closed' && closeAction
             ? buildTaskPageGitHubCloseUpdate(closeAction)
@@ -79,25 +83,25 @@ export function runGHEditStateChange({
       }),
     onOptimistic: () => {
       authority = assertTaskPageGitHubDialogStateAuthority({
-        repoId: item.repoId,
-        itemId: item.id,
+        repoId: itemRepoId,
+        itemId,
         state: newState,
         sourceContext
       })
       onStateChange(newState)
-      patchWorkItem(item.id, { state: newState }, item.repoId, { sourceContext })
+      patchWorkItem(itemId, { state: newState }, itemRepoId, { sourceContext })
       patchProjectRowIfNeeded({ state: newState })
     },
     onRevert: () => {
       if (authority?.revert()) {
         onStateChange(prevState)
-        patchWorkItem(item.id, { state: prevState }, item.repoId, { sourceContext })
+        patchWorkItem(itemId, { state: prevState }, itemRepoId, { sourceContext })
         patchProjectRowIfNeeded({ state: prevState })
       }
     },
     onSuccess: () => {
       useAppStore.getState().recordFeatureInteraction('github-tasks')
-      patchWorkItem(item.id, { state: newState }, item.repoId, { sourceContext })
+      patchWorkItem(itemId, { state: newState }, itemRepoId, { sourceContext })
       patchProjectRowIfNeeded({ state: newState })
       onMutated()
     },
@@ -134,7 +138,9 @@ export function closeGHEditAsDuplicate({
 export function runGHEditLabelToggle({
   label,
   localLabels,
-  item,
+  itemId,
+  itemNumber,
+  itemRepoId,
   repoPath,
   sourceContext,
   projectOrigin,
@@ -144,6 +150,7 @@ export function runGHEditLabelToggle({
   patchProjectRowIfNeeded,
   onMutated
 }: GHEditMutationBase & {
+  itemId: GitHubWorkItem['id']
   label: string
   localLabels: string[]
   onLabelsChange: (labels: string[]) => void
@@ -162,16 +169,16 @@ export function runGHEditLabelToggle({
     void run('labels', {
       mutate: () =>
         runIssueUpdate({
-          repoId: item.repoId,
+          repoId: itemRepoId,
           repoPath,
           sourceContext,
           projectOrigin,
-          number: item.number,
+          number: itemNumber,
           updates: { addLabels: [label] }
         }),
       onOptimistic: () => {
         onLabelsChange(newLabels)
-        patchWorkItem(item.id, { labels: newLabels }, item.repoId, { sourceContext })
+        patchWorkItem(itemId, { labels: newLabels }, itemRepoId, { sourceContext })
         patchProjectRowIfNeeded({ labels: newLabels })
       },
       onSuccess: () => {
@@ -180,7 +187,7 @@ export function runGHEditLabelToggle({
       },
       onRevert: () => {
         onLabelsChange(prevLabels)
-        patchWorkItem(item.id, { labels: prevLabels }, item.repoId, { sourceContext })
+        patchWorkItem(itemId, { labels: prevLabels }, itemRepoId, { sourceContext })
         patchProjectRowIfNeeded({ labels: prevLabels })
       },
       onError: (err) => toast.error(err)
@@ -190,21 +197,21 @@ export function runGHEditLabelToggle({
   void run('labels', {
     mutate: () =>
       runIssueUpdate({
-        repoId: item.repoId,
+        repoId: itemRepoId,
         repoPath,
         sourceContext,
         projectOrigin,
-        number: item.number,
+        number: itemNumber,
         updates: { removeLabels: [label] }
       }),
     onOptimistic: () => {
       onLabelsChange(newLabels)
-      patchWorkItem(item.id, { labels: newLabels }, item.repoId, { sourceContext })
+      patchWorkItem(itemId, { labels: newLabels }, itemRepoId, { sourceContext })
       patchProjectRowIfNeeded({ labels: newLabels })
     },
     onRevert: () => {
       onLabelsChange(prevLabels)
-      patchWorkItem(item.id, { labels: prevLabels }, item.repoId, { sourceContext })
+      patchWorkItem(itemId, { labels: prevLabels }, itemRepoId, { sourceContext })
       patchProjectRowIfNeeded({ labels: prevLabels })
     },
     onSuccess: () => {
@@ -220,7 +227,8 @@ export function runGHEditAssigneeToggle({
   localAssignees,
   assigneesItemKey,
   editedAssigneesItemKeyRef,
-  item,
+  itemNumber,
+  itemRepoId,
   repoPath,
   sourceContext,
   projectOrigin,
@@ -247,11 +255,11 @@ export function runGHEditAssigneeToggle({
     void run('assignees', {
       mutate: () =>
         runIssueUpdate({
-          repoId: item.repoId,
+          repoId: itemRepoId,
           repoPath,
           sourceContext,
           projectOrigin,
-          number: item.number,
+          number: itemNumber,
           updates: { removeAssignees: [login] }
         }),
       onOptimistic: () => {
@@ -273,11 +281,11 @@ export function runGHEditAssigneeToggle({
   void run('assignees', {
     mutate: () =>
       runIssueUpdate({
-        repoId: item.repoId,
+        repoId: itemRepoId,
         repoPath,
         sourceContext,
         projectOrigin,
-        number: item.number,
+        number: itemNumber,
         updates: { addAssignees: [login] }
       }),
     onOptimistic: () => {

@@ -83,6 +83,19 @@ export function useGitHubItemDialogDetails({
     issueSourcePreference
   ])
 
+  // Why: reset during render so an item switch never paints the previous item's tab.
+  const tabResetKey =
+    workItem && effectiveRepoId && detailsCacheKey && canUseDetailsRepoContext
+      ? `${workItem.id}\0${initialTab ?? ''}`
+      : null
+  const [resolvedTabKey, setResolvedTabKey] = useState(tabResetKey)
+  if (resolvedTabKey !== tabResetKey) {
+    setResolvedTabKey(tabResetKey)
+    if (workItem && tabResetKey) {
+      setTab(normalizeItemDialogTab(workItem, initialTab))
+    }
+  }
+
   // Why: hold comments added before the detail fetch resolves so they merge into the result instead of being overwritten.
   const optimisticCommentsRef = useRef<PRComment[]>([])
   // Why: distinguish "reopen same item" from "switch item" — reopen must keep optimistic comments since gh's 60s cache omits the just-posted one.
@@ -148,7 +161,6 @@ export function useGitHubItemDialogDetails({
       optimisticCommentsRef.current = []
     }
     prevItemIdRef.current = workItem.id
-    setTab(normalizeItemDialogTab(workItem, initialTab))
 
     const cached = workItemDetailsCache.get(detailsCacheKey)
     const now = Date.now()
@@ -189,7 +201,6 @@ export function useGitHubItemDialogDetails({
     sourceContext,
     workItem,
     detailsCacheKey,
-    initialTab,
     refetchTick
   ])
 
@@ -268,7 +279,7 @@ export function useGitHubItemDialogDetails({
     async (path: string, viewed: boolean): Promise<boolean> =>
       syncPRFileViewedState({
         canUseDetailsRepoContext,
-        details,
+        pullRequestId: details?.pullRequestId,
         workItem,
         detailsCacheKey,
         repoPath,
@@ -280,7 +291,7 @@ export function useGitHubItemDialogDetails({
       }),
     [
       canUseDetailsRepoContext,
-      details,
+      details?.pullRequestId,
       detailsCacheKey,
       projectOrigin,
       repoPath,

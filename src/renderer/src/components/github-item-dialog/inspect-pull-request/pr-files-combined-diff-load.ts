@@ -27,7 +27,6 @@ type LoadSectionArgs = {
   sectionsRef: { current: DiffSection[] }
   loadedIndicesRef: { current: Set<number> }
   loadingIndicesRef: { current: Set<number> }
-  generationRef: { current: number }
   fileByPath: Map<string, GitHubPRFile>
   repoPath: string
   repoId: string
@@ -44,7 +43,6 @@ export function loadPRFilesCombinedDiffSection({
   sectionsRef,
   loadedIndicesRef,
   loadingIndicesRef,
-  generationRef,
   fileByPath,
   repoPath,
   repoId,
@@ -66,7 +64,6 @@ export function loadPRFilesCombinedDiffSection({
   if (!file) {
     return
   }
-  const generation = generationRef.current
   loadingIndicesRef.current.add(index)
 
   const load = async (): Promise<{
@@ -127,9 +124,6 @@ export function loadPRFilesCombinedDiffSection({
     }))
     .then(({ result, resultContents, error }) => {
       loadingIndicesRef.current.delete(index)
-      if (generationRef.current !== generation) {
-        return
-      }
       const largeDiffRenderLimit =
         !error && result.kind === 'text' && resultContents
           ? getPRFileContentsRenderLimit(resultContents)

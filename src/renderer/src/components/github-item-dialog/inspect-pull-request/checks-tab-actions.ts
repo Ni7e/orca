@@ -23,7 +23,8 @@ export type ChecksTabActionContext = {
   sourceContext?: TaskSourceContext | null
   repoId: string | null
   repoPath: string | null
-  item: GitHubWorkItem
+  itemNumber: number
+  itemRepoId: string
   headSha: string | undefined
   prRepo: GitHubOwnerRepo | null
   mountedRef: { current: boolean }
@@ -65,8 +66,8 @@ export async function refreshGitHubChecksTab(
           { kind: 'environment', environmentId: ctx.runtimeHost.environmentId },
           'github.prChecks',
           {
-            repo: getGitHubRuntimeRepoId(ctx.sourceContext, ctx.repoId ?? ctx.item.repoId),
-            prNumber: ctx.item.number,
+            repo: getGitHubRuntimeRepoId(ctx.sourceContext, ctx.repoId ?? ctx.itemRepoId),
+            prNumber: ctx.itemNumber,
             headSha: ctx.headSha,
             prRepo: ctx.prRepo,
             noCache: true
@@ -77,7 +78,7 @@ export async function refreshGitHubChecksTab(
           repoPath: ctx.repoPath ?? '',
           repoId: ctx.repoId ?? undefined,
           sourceContext: ctx.sourceContext,
-          prNumber: ctx.item.number,
+          prNumber: ctx.itemNumber,
           headSha: ctx.headSha,
           prRepo: ctx.prRepo,
           noCache: true
@@ -137,8 +138,8 @@ export async function rerunGitHubChecksTab(
           { kind: 'environment', environmentId: ctx.runtimeHost.environmentId },
           'github.rerunPRChecks',
           {
-            repo: getGitHubRuntimeRepoId(ctx.sourceContext, ctx.repoId ?? ctx.item.repoId),
-            prNumber: ctx.item.number,
+            repo: getGitHubRuntimeRepoId(ctx.sourceContext, ctx.repoId ?? ctx.itemRepoId),
+            prNumber: ctx.itemNumber,
             headSha: ctx.headSha,
             failedOnly,
             prRepo: ctx.prRepo
@@ -149,7 +150,7 @@ export async function rerunGitHubChecksTab(
           repoPath: ctx.repoPath ?? '',
           repoId: ctx.repoId ?? undefined,
           sourceContext: ctx.sourceContext,
-          prNumber: ctx.item.number,
+          prNumber: ctx.itemNumber,
           headSha: ctx.headSha,
           failedOnly,
           prRepo: ctx.prRepo

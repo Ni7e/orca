@@ -3,17 +3,14 @@ import { setPRFileViewedForRepo } from '@/components/github/github-work-item-com
 import { resolvePullRequestRepo } from '@/components/github/github-work-item-identity'
 import { translate } from '@/i18n/i18n'
 import type { GitHubPRFileViewedState } from '../../../../../shared/github/pull-request-types'
-import type {
-  GitHubWorkItem,
-  GitHubWorkItemDetails
-} from '../../../../../shared/github/work-item-types'
+import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'
 import type { GitHubItemDialogProjectOrigin } from './github-item-dialog-types'
 import { patchCachedPRFileViewedState } from './work-item-details-cache'
 
 export async function syncPRFileViewedState(args: {
   canUseDetailsRepoContext: boolean
-  details: GitHubWorkItemDetails | null
+  pullRequestId: string | undefined
   workItem: GitHubWorkItem | null
   detailsCacheKey: string | null
   repoPath: string | null
@@ -25,7 +22,7 @@ export async function syncPRFileViewedState(args: {
 }): Promise<boolean> {
   const {
     canUseDetailsRepoContext,
-    details,
+    pullRequestId,
     workItem,
     detailsCacheKey,
     repoPath,
@@ -35,7 +32,7 @@ export async function syncPRFileViewedState(args: {
     viewed,
     setPendingViewedPaths
   } = args
-  if (!canUseDetailsRepoContext || !details?.pullRequestId || !workItem || workItem.type !== 'pr') {
+  if (!canUseDetailsRepoContext || !pullRequestId || !workItem || workItem.type !== 'pr') {
     toast.error(
       translate(
         'auto.components.GitHubItemDialog.c0253318d6',
@@ -56,7 +53,7 @@ export async function syncPRFileViewedState(args: {
       sourceContext,
       prNumber: workItem.number,
       prRepo: resolvePullRequestRepo(workItem, projectOrigin),
-      pullRequestId: details.pullRequestId,
+      pullRequestId,
       path,
       viewed
     })

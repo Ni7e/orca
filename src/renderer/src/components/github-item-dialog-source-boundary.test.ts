@@ -237,7 +237,7 @@ describe('GitHubItemDialog source host boundaries', () => {
     expect(checksSection).toContain("'github.rerunPRChecks'")
     expect(checksSection).toContain("'github.prCheckDetails'")
     expect(checksSection).toContain(
-      'repo: getGitHubRuntimeRepoId(ctx.sourceContext, ctx.repoId ?? ctx.item.repoId)'
+      'repo: getGitHubRuntimeRepoId(ctx.sourceContext, ctx.repoId ?? ctx.itemRepoId)'
     )
     expect(checksSection).toContain('window.api.gh.prChecks({')
     expect(checksSection).toContain('window.api.gh.rerunPRChecks({')

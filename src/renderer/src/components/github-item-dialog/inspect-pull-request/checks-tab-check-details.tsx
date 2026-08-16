@@ -9,6 +9,8 @@ import { translate } from '@/i18n/i18n'
 import { getCheckConclusion } from '@/components/pr-check-counts'
 import {
   formatCheckTimestamp,
+  getKeyedCheckAnnotations,
+  getKeyedCheckJobs,
   getCheckDetailsKey,
   getCheckStatusLabel
 } from '@/components/github/pr-check-presentation'
@@ -118,41 +120,43 @@ export function ChecksTabCheckDetails({
                 {translate('auto.components.GitHubItemDialog.96d8f36798', 'Annotations')}
               </div>
               <div className="flex flex-col">
-                {details!.annotations.map((annotation, index) => (
-                  <div
-                    key={`${annotation.path ?? 'annotation'}-${index}`}
-                    className={cn(
-                      'min-w-0 px-2.5 py-2 text-[12px]',
-                      index > 0 && 'border-t border-border/30'
-                    )}
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">
-                        {annotation.path ??
-                          translate('auto.components.GitHubItemDialog.7d42606f66', 'Annotation')}
-                        {annotation.startLine ? `:${annotation.startLine}` : ''}
-                      </span>
-                      {annotation.annotationLevel && (
-                        <span className="shrink-0 text-[11px] text-muted-foreground">
-                          {annotation.annotationLevel}
+                {getKeyedCheckAnnotations(details!.annotations).map(
+                  ({ key, item: annotation }, index) => (
+                    <div
+                      key={key}
+                      className={cn(
+                        'min-w-0 px-2.5 py-2 text-[12px]',
+                        index > 0 && 'border-t border-border/30'
+                      )}
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">
+                          {annotation.path ??
+                            translate('auto.components.GitHubItemDialog.7d42606f66', 'Annotation')}
+                          {annotation.startLine ? `:${annotation.startLine}` : ''}
                         </span>
+                        {annotation.annotationLevel && (
+                          <span className="shrink-0 text-[11px] text-muted-foreground">
+                            {annotation.annotationLevel}
+                          </span>
+                        )}
+                      </div>
+                      {annotation.title && (
+                        <div className="mt-1 text-[12px] font-medium text-foreground">
+                          {annotation.title}
+                        </div>
+                      )}
+                      <div className="mt-1 break-words text-[12px] text-foreground">
+                        {annotation.message}
+                      </div>
+                      {annotation.rawDetails && (
+                        <pre className="mt-1 whitespace-pre-wrap rounded bg-muted/40 p-2 font-mono text-[11px] text-muted-foreground">
+                          {annotation.rawDetails}
+                        </pre>
                       )}
                     </div>
-                    {annotation.title && (
-                      <div className="mt-1 text-[12px] font-medium text-foreground">
-                        {annotation.title}
-                      </div>
-                    )}
-                    <div className="mt-1 break-words text-[12px] text-foreground">
-                      {annotation.message}
-                    </div>
-                    {annotation.rawDetails && (
-                      <pre className="mt-1 whitespace-pre-wrap rounded bg-muted/40 p-2 font-mono text-[11px] text-muted-foreground">
-                        {annotation.rawDetails}
-                      </pre>
-                    )}
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             </div>
           )}
@@ -163,9 +167,9 @@ export function ChecksTabCheckDetails({
                 {translate('auto.components.GitHubItemDialog.08d072664d', 'Jobs')}
               </div>
               <div className="flex flex-col">
-                {details!.jobs.map((job, index) => (
+                {getKeyedCheckJobs(details!.jobs).map(({ key, item: job }, index) => (
                   <div
-                    key={`${job.name}-${index}`}
+                    key={key}
                     className={cn('min-w-0 px-2.5 py-2', index > 0 && 'border-t border-border/30')}
                   >
                     <div className="flex min-w-0 items-center gap-2">

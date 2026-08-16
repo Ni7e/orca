@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { editor as monacoEditor } from 'monaco-editor'
 import type { DecoratedDiffComment } from '@/components/diff-comments/decorated-diff-comment'
@@ -16,7 +16,6 @@ import {
   type CombinedDiffFileTreeEntry
 } from '@/components/editor/combined-diff-file-tree-model'
 import { useAppStore } from '@/store'
-import { githubRepoIdentityKey } from '../../../../../shared/github/repository-identity-key'
 import type { GitBranchChangeEntry } from '../../../../../shared/git-diff-compare-types'
 import { isPRFileViewed } from '@/components/github/pr-file-content-size'
 import {
@@ -28,6 +27,7 @@ import {
 import { formatRelativeTime } from '@/components/github/work-item-state-presentation'
 import { PRViewedCheckbox } from '@/components/github/PRViewedCheckbox'
 import { PRFilesCombinedDiffBody } from './pr-files-combined-diff-body'
+import { getPRFilesCombinedDiffSignature } from './pr-files-combined-diff-signature'
 import {
   addPRFilesCombinedDiffLineComment,
   loadPRFilesCombinedDiffSection,
@@ -36,7 +36,47 @@ import {
   togglePRFilesCombinedDiffSection
 } from './pr-files-combined-diff-load'
 
-export function PRFilesCombinedDiffViewer({
+type PRFilesCombinedDiffSectionsProps = PRFilesCombinedDiffViewerProps & {
+  sideBySide: boolean
+  setSideBySide: React.Dispatch<React.SetStateAction<boolean>>
+  fileTreeCollapsed: boolean
+  setFileTreeCollapsed: (next: boolean) => void
+}
+
+export function PRFilesCombinedDiffViewer(
+  props: PRFilesCombinedDiffViewerProps
+): React.JSX.Element {
+  const { files, repoId, prNumber, prRepo, headSha, baseSha } = props
+  const signature = useMemo(
+    () =>
+      getPRFilesCombinedDiffSignature({
+        files,
+        repoId,
+        prNumber,
+        prRepo,
+        headSha,
+        baseSha
+      }),
+    [baseSha, files, headSha, prNumber, prRepo, repoId]
+  )
+  // Why: view preferences outlive a diff-set swap, so they live above the keyed subtree.
+  const [sideBySide, setSideBySide] = useState(false)
+  const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false)
+  // Why: remounting on the signature retires the previous diff set's sections, loaded
+  // indices, and in-flight results in one step, so nothing can leak across the swap.
+  return (
+    <PRFilesCombinedDiffSections
+      key={signature}
+      {...props}
+      sideBySide={sideBySide}
+      setSideBySide={setSideBySide}
+      fileTreeCollapsed={fileTreeCollapsed}
+      setFileTreeCollapsed={setFileTreeCollapsed}
+    />
+  )
+}
+
+function PRFilesCombinedDiffSections({
   files,
   comments,
   repoPath,
@@ -49,44 +89,39 @@ export function PRFilesCombinedDiffViewer({
   baseSha,
   pendingViewedPaths,
   onCommentAdded,
-  onViewedChange
-}: PRFilesCombinedDiffViewerProps): React.JSX.Element {
+  onViewedChange,
+  sideBySide,
+  setSideBySide,
+  fileTreeCollapsed,
+  setFileTreeCollapsed
+}: PRFilesCombinedDiffSectionsProps): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
   const isDark =
     settings?.theme === 'dark' ||
     (settings?.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  const entriesCacheRef = useRef<{
-    signature: string
-    entries: GitBranchChangeEntry[]
-  } | null>(null)
-  const diffEntrySignature = useMemo(
-    () =>
-      JSON.stringify(
-        files.map((file) => ({
-          path: file.path,
-          oldPath: file.oldPath ?? null,
-          status: file.status,
-          additions: file.additions,
-          deletions: file.deletions,
-          isBinary: file.isBinary
-        }))
-      ),
-    [files]
+  // Why: this subtree is keyed by the diff signature, so its file set is fixed for the
+  // mount. Freezing it in state keeps a stable identity without caching through a ref.
+  const [entries] = useState<GitBranchChangeEntry[]>(() =>
+    getCombinedDiffBranchEntriesInTreeOrder('commit', files.map(gitHubPRFileToBranchEntry))
   )
-  const entries = useMemo(() => {
-    if (entriesCacheRef.current?.signature === diffEntrySignature) {
-      return entriesCacheRef.current.entries
-    }
-    const nextEntries = getCombinedDiffBranchEntriesInTreeOrder(
-      'commit',
-      files.map(gitHubPRFileToBranchEntry)
-    )
-    entriesCacheRef.current = {
-      signature: diffEntrySignature,
-      entries: nextEntries
-    }
-    return nextEntries
-  }, [diffEntrySignature, files])
+  const [sections, setSections] = useState<DiffSection[]>(() =>
+    entries.map((entry) => ({
+      key: getPRFileSectionKey(entry.path),
+      path: entry.path,
+      oldPath: entry.oldPath,
+      status: entry.status,
+      added: entry.added,
+      removed: entry.removed,
+      originalContent: '',
+      modifiedContent: '',
+      collapsed: false,
+      loading: true,
+      error: undefined,
+      dirty: false,
+      diffResult: null,
+      largeDiffRenderLimit: null
+    }))
+  )
   const fileByPath = useMemo(() => new Map(files.map((file) => [file.path, file])), [files])
   const inlineReviewComments = useMemo<DecoratedDiffComment[]>(
     () =>
@@ -118,57 +153,21 @@ export function PRFilesCombinedDiffViewer({
       }),
     [comments, prNumber, repoId]
   )
-  const entrySignature = useMemo(
-    () =>
-      JSON.stringify({
-        repoId,
-        prNumber,
-        prRepo: prRepo ? githubRepoIdentityKey(prRepo) : null,
-        headSha: headSha ?? null,
-        baseSha: baseSha ?? null,
-        files: diffEntrySignature
-      }),
-    [baseSha, diffEntrySignature, headSha, prNumber, prRepo, repoId]
-  )
-  const [sections, setSections] = useState<DiffSection[]>([])
-  const [sideBySide, setSideBySide] = useState(false)
-  const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false)
   const [sectionHeights, setSectionHeights] = useState<Record<number, number>>({})
   const [activeTreeSectionKey, setActiveTreeSectionKey] = useState<string | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const loadedIndicesRef = useRef<Set<number>>(new Set())
   const loadingIndicesRef = useRef<Set<number>>(new Set())
-  const sectionsRef = useRef<DiffSection[]>([])
-  const generationRef = useRef(0)
+  const sectionsRef = useRef<DiffSection[]>(sections)
   const modifiedEditorsRef = useRef<Map<number, monacoEditor.IStandaloneCodeEditor>>(new Map())
   const handleSectionSaveRef = useRef<(index: number) => Promise<void>>(async () => {})
-  sectionsRef.current = sections
 
-  useEffect(() => {
-    generationRef.current += 1
-    loadedIndicesRef.current.clear()
-    loadingIndicesRef.current.clear()
-    setSectionHeights({})
-    setActiveTreeSectionKey(null)
-    setSections(
-      entries.map((entry) => ({
-        key: getPRFileSectionKey(entry.path),
-        path: entry.path,
-        oldPath: entry.oldPath,
-        status: entry.status,
-        added: entry.added,
-        removed: entry.removed,
-        originalContent: '',
-        modifiedContent: '',
-        collapsed: false,
-        loading: true,
-        error: undefined,
-        dirty: false,
-        diffResult: null,
-        largeDiffRenderLimit: null
-      }))
-    )
-  }, [entries, entrySignature])
+  // Why: commit-phase write (a render React abandons would leak one), and it must be a layout
+  // effect — collapsing rekeys a section's virtual item, so the remounted DiffSectionItem's
+  // passive effect calls loadSection before any passive effect here could sync this ref.
+  useLayoutEffect(() => {
+    sectionsRef.current = sections
+  }, [sections])
 
   const loadSection = useCallback(
     (index: number) => {
@@ -177,7 +176,6 @@ export function PRFilesCombinedDiffViewer({
         sectionsRef,
         loadedIndicesRef,
         loadingIndicesRef,
-        generationRef,
         fileByPath,
         repoPath,
         repoId,
@@ -262,9 +260,7 @@ export function PRFilesCombinedDiffViewer({
     overscan: PR_DIFF_OVERSCAN,
     getItemKey: (index) => {
       const section = sections[index]
-      return section
-        ? `${section.key}:${section.collapsed ? 'collapsed' : 'expanded'}:${entrySignature}`
-        : `${index}:${entrySignature}`
+      return section ? `${section.key}:${section.collapsed ? 'collapsed' : 'expanded'}` : `${index}`
     }
   })
 

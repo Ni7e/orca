@@ -26,6 +26,7 @@ export function renderCheckRow({
   const key = getCheckDetailsKey(check)
   return (
     <ChecksTabCheckRow
+      key={key}
       check={check}
       variant={variant}
       expanded={expandedCheckKey === key}
@@ -55,9 +56,8 @@ export function ChecksTabCheckRow({
   const Icon = CHECK_ICON[conclusion] ?? CircleDashed
   const color = CHECK_COLOR[conclusion] ?? 'text-muted-foreground'
   const statusLabel = getCheckStatusLabel(check)
-  const key = getCheckDetailsKey(check)
   return (
-    <div key={key} className="min-w-0">
+    <div className="min-w-0">
       <button
         type="button"
         onClick={() => onToggle(check)}
