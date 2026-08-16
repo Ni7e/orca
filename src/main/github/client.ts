@@ -2315,8 +2315,12 @@ async function getCurrentHeadOid(
   connectionId?: string | null,
   localGitOptions: { wslDistro?: string } = {}
 ): Promise<string | null> {
+  const provider = connectionId ? getSshGitProvider(connectionId) : null
+  if (connectionId && !provider) {
+    // Why: repoPath is remote — a dropped SSH provider must answer "unknown", never run client git against a same-named local path.
+    return null
+  }
   try {
-    const provider = connectionId ? getSshGitProvider(connectionId) : null
     const result = provider
       ? await provider.exec(['rev-parse', 'HEAD'], repoPath)
       : await gitExecFileAsync(['rev-parse', 'HEAD'], {
@@ -2814,8 +2818,12 @@ async function probeTrackedUpstreamBranches(
   upstreamsByBranchName: Map<string, TrackedUpstreamBranch | null>
 }> {
   const args = ['for-each-ref', '--format=%(refname)%00%(upstream)', 'refs/heads']
+  const provider = connectionId ? getSshGitProvider(connectionId) : null
+  if (connectionId && !provider) {
+    // Why: repoPath is remote — a dropped SSH provider must fail the probe, never enumerate a same-named local repo's refs.
+    return { probeFailed: true, upstreamsByBranchName: new Map() }
+  }
   try {
-    const provider = connectionId ? getSshGitProvider(connectionId) : null
     const result = provider
       ? await provider.exec(args, repoPath)
       : await gitExecFileAsync(args, {
