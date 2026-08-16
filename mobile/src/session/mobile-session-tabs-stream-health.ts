@@ -19,6 +19,7 @@ type RequestOwner = {
 type RequestCohort = {
   promise: Promise<void>
   resolve: () => void
+  retry: boolean
 }
 
 type ControllerOptions<Result, Tab> = {
@@ -87,12 +88,13 @@ export class MobileSessionTabsStreamHealth<Result, Tab> {
 
   retryReconciliation(): Promise<void> {
     this.syncGeneration()
-    this.requirementRevision += 1
-    const key = `${this.generation}:${this.barrier}`
-    if (this.inFlight.has(key)) {
-      this.barrier += 1
+    const currentRequest = this.inFlight.get(`${this.generation}:${this.barrier}`)
+    if (currentRequest?.retry) {
+      return currentRequest.promise
     }
-    return this.startCurrentRequest()
+    this.requirementRevision += 1
+    this.barrier += currentRequest ? 1 : 0
+    return this.startCurrentRequest(true)
   }
 
   poll(): Promise<void> | null {
@@ -205,7 +207,7 @@ export class MobileSessionTabsStreamHealth<Result, Tab> {
     this.requirementRevision += 1
   }
 
-  private startCurrentRequest(): Promise<void> {
+  private startCurrentRequest(retry = false): Promise<void> {
     if (this.disposed || !this.reconciliationActive) {
       return Promise.resolve()
     }
@@ -218,7 +220,7 @@ export class MobileSessionTabsStreamHealth<Result, Tab> {
     const promise = new Promise<void>((resolve) => {
       resolveRequest = resolve
     })
-    const cohort = { promise, resolve: resolveRequest }
+    const cohort = { promise, resolve: resolveRequest, retry }
     this.inFlight.set(key, cohort)
     this.runCohortRequest(key, cohort)
     return promise

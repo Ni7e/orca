@@ -249,6 +249,8 @@ describe('pending-handle recovery through MobileSessionTabsStreamHealth', () => 
     const retry = harness.controller.retryReconciliation()
     expect(retry).not.toBe(halfOpen)
     expect(harness.sendRequest).toHaveBeenCalledTimes(2)
+    expect(harness.controller.retryReconciliation()).toBe(retry)
+    expect(harness.sendRequest).toHaveBeenCalledTimes(2)
 
     harness.resolveNext(snapshot('stale-handle'))
     await halfOpen
