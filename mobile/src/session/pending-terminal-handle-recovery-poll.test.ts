@@ -1,5 +1,5 @@
 import { createElement } from 'react'
-import { act, create } from 'react-test-renderer'
+import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcSuccess } from '../transport/types'
@@ -119,7 +119,7 @@ async function flush(): Promise<void> {
 }
 
 describe('bounded pending-handle reconciliation cadence', () => {
-  let renderer: ReturnType<typeof create> | null = null
+  let renderer: ReactTestRenderer | null = null
 
   beforeEach(() => {
     vi.useFakeTimers()
