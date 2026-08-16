@@ -47,7 +47,7 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
 
-    expect(plan?.launchCommand).toBe("claude 'fix Bob'\\''s branch'")
+    expect(plan?.launchCommand).toBe("claude 'fix Bob'\"'\"'s branch'")
   })
 
   it('uses PowerShell quoting by default when the target shell is Windows', () => {
@@ -184,9 +184,12 @@ describe('tui agent startup plans', () => {
     })
 
     expect(plan?.launchCommand).toMatch(/^sh -c /)
-    expect(plan?.launchCommand).toMatch(/\\0[0-7]{3}/)
     expect(plan?.launchCommand).not.toContain("'sh' '-c'")
-    expect(plan?.launchCommand).not.toContain("'\\''")
+    // Why parse rather than string-match: the octal escapes must survive the
+    // OUTER quoting to reach the inner sh, and portable quoting emits a
+    // backslash as `"\\"` rather than leaving it inside a single-quoted run.
+    const tokens = tokenizeStartupCommand(plan?.launchCommand ?? '', 'posix')
+    expect(tokens.ok && tokens.tokens.at(-1)).toMatch(/\\0[0-7]{3}/)
   })
 
   it('moves Hermes command override flags after the chat subcommand', () => {
@@ -856,7 +859,7 @@ describe('tui agent startup plans', () => {
     expect(plan).not.toBeNull()
     expect(plan?.env).toEqual({ ORCA_OMP_PREFILL: 'fix the omp regression' })
     expect(plan?.expectedProcess).toBe('omp')
-    expect(plan?.launchCommand).toBe('omp; unset ORCA_OMP_PREFILL')
+    expect(plan?.launchCommand).toBe(`omp; command test -n "$fish_pid" && set --erase -g ORCA_OMP_PREFILL; command test -z "$fish_pid" && unset ORCA_OMP_PREFILL; true`)
   })
 
   it('returns null for oversized Windows flag drafts so callers paste after ready', () => {

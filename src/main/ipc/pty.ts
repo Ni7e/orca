@@ -4741,7 +4741,8 @@ export function registerPtyHandlers(
         rows: args.rows,
         cwd,
         env,
-        ...(isNewDaemonSession ? { isNewSession: true } : {})
+        ...(isNewDaemonSession ? { isNewSession: true } : {}),
+        historyIsolationEnabled: getSettings?.()?.terminalScopeHistoryByWorktree ?? true
       }
       if (!args.connectionId && !isDaemonHostSpawn) {
         spawnOptions.codexHomePathOverride = { value: selectedCodexHomePath }
@@ -6461,7 +6462,8 @@ export function registerPtyHandlers(
           cwd,
           ...(prevalidatedCwd && !isDaemonHostSpawn ? { prevalidatedCwd } : {}),
           env: spawnEnv,
-          ...(isMintedSessionId ? { isNewSession: true } : {})
+          ...(isMintedSessionId ? { isNewSession: true } : {}),
+          historyIsolationEnabled: getSettings?.()?.terminalScopeHistoryByWorktree ?? true
         }
         if (!args.connectionId && !isDaemonHostSpawn) {
           spawnOptions.codexHomePathOverride = { value: selectedCodexHomePath }

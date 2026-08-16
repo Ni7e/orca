@@ -265,6 +265,7 @@ import {
   removeStaleLocalWorktreeRegistrationAfterFilesystemRemoval,
   recoverLocalWindowsWorktreeRemoval
 } from '../local-worktree-removal-recovery'
+import { deleteRemoteWorktreeHistory } from '../remote-worktree-history-cleanup'
 
 const NullableWorkspaceLinkedItemSchema = WorkspaceLinkedItemSchema.nullable()
 const NullableTaskSourceContextSchema = TaskSourceContextSchema.nullable()
@@ -2493,15 +2494,15 @@ export function registerWorktreeHandlers(
                 'Cannot delete the project root workspace. Remove the folder project instead.'
               )
             }
+            const ownerHost = parseExecutionHostId(removalHostId)
+            const sshPtyProvider =
+              ownerHost?.kind === 'ssh' ? getSshPtyProvider(ownerHost.targetId) : undefined
             // Why: folder workspaces share one root, so there's no Git remove step to close shells; sweep PTYs before dropping metadata.
             await withWorktreeRemoveStageSpan('pty_sweep', 'folder', async () => {
               // Folder projects can be SSH-backed, so fence the sweep to the owning host exactly
               // like the git paths — the local inventory must never reach a remote workspace's id.
               // The resolved repo is authoritative here: path-derived metadata is shared by
               // same-id host copies and can describe a different owner's workspace.
-              const ownerHost = parseExecutionHostId(removalHostId)
-              const sshPtyProvider =
-                ownerHost?.kind === 'ssh' ? getSshPtyProvider(ownerHost.targetId) : undefined
               const externalHost = ownerHost?.kind === 'ssh' || ownerHost?.kind === 'runtime'
               await killAllProcessesForWorktree(args.worktreeId, {
                 runtime,
@@ -2524,6 +2525,7 @@ export function registerWorktreeHandlers(
               })
             })
             await withWorktreeRemoveStageSpan('metadata_purge', 'folder', async () => {
+              await deleteRemoteWorktreeHistory(sshPtyProvider, args.worktreeId)
               removeWorktreeMetadataAndTransientState(
                 store,
                 args.worktreeId,
@@ -2618,6 +2620,10 @@ export function registerWorktreeHandlers(
                   args.worktreeId,
                   removedPushTarget,
                   store
+                )
+                await deleteRemoteWorktreeHistory(
+                  getSshPtyProvider(repo.connectionId),
+                  args.worktreeId
                 )
               } else {
                 const removalGate = await runtime.acquireFileWatcherRemoval(worktreePath)
@@ -2726,6 +2732,10 @@ export function registerWorktreeHandlers(
                   args.worktreeId,
                   removedPushTarget,
                   store
+                )
+                await deleteRemoteWorktreeHistory(
+                  getSshPtyProvider(repo.connectionId),
+                  args.worktreeId
                 )
               } else {
                 await cleanupUnusedWorktreePushTargetRemote(
@@ -2897,6 +2907,10 @@ export function registerWorktreeHandlers(
               args.worktreeId,
               removedPushTarget,
               store
+            )
+            await deleteRemoteWorktreeHistory(
+              getSshPtyProvider(remoteConnectionId),
+              args.worktreeId
             )
             rememberPreservedBranchCleanupTarget(
               args.worktreeId,

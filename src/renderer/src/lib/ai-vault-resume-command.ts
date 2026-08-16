@@ -70,9 +70,7 @@ export function buildAiVaultResumeCopyCommandForWorktree(args: AiVaultResumeWork
   }
   const shell = resolveAiVaultResumeShell(args)
   const separator = commandSeparator(shell)
-  const clearHomes = ['CODEX_HOME', 'ORCA_CODEX_HOME']
-    .map((name) => clearEnvCommand(name, shell))
-    .join(separator)
+  const clearHomes = clearEnvCommand(['CODEX_HOME', 'ORCA_CODEX_HOME'], shell)
   return `${clearHomes}${separator}${command}`
 }
 
@@ -241,30 +239,8 @@ function resolveAiVaultResumeShell(args: AiVaultResumeWorktreeArgs): AgentStartu
     state: args.state,
     worktreeId: args.worktreeId,
     platform,
-    isLocalSession,
-    parsedByClientLoginShell: isLocalSession && runsOnClientLoginShell(args, platform)
+    isLocalSession
   })
-}
-
-/**
- * Whether the resume line is handed to THIS machine's login shell.
- *
- * Why not `isLocalSession`: that only says the session file was scanned locally
- * (no executionHostId), which is still true when the worktree lives on an SSH
- * or runtime host — the command then goes to that host's shell. The WSL case is
- * caught by the platform mismatch (a WSL worktree resolves to 'linux' on win32).
- */
-function runsOnClientLoginShell(
-  args: AiVaultResumeWorktreeArgs,
-  platform: NodeJS.Platform
-): boolean {
-  const executionHost = parseExecutionHostId(
-    getExecutionHostIdForWorktree(args.state, args.worktreeId ?? args.state.activeWorktreeId)
-  )
-  if (executionHost?.kind === 'ssh' || executionHost?.kind === 'runtime') {
-    return false
-  }
-  return platform === CLIENT_PLATFORM
 }
 
 export function getAiVaultAgentProviderSession(
