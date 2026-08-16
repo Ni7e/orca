@@ -60,7 +60,11 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
 }: Params<Result, Tab>): ResultActions {
   const pendingTerminalRecoveryBudget = useMemo(() => new PendingTerminalHandleRecoveryBudget(), [])
   const onPendingTerminalRecoveryParkedRef = useRef(onPendingTerminalRecoveryParked)
-  onPendingTerminalRecoveryParkedRef.current = onPendingTerminalRecoveryParked
+  // Why: only poll/reset callbacks read this, and they run after commit — so writing it in
+  // render would let a discarded render leak a callback that never mounted.
+  useEffect(() => {
+    onPendingTerminalRecoveryParkedRef.current = onPendingTerminalRecoveryParked
+  })
   const combinedHasRecoveryNeed = useCallback(() => {
     const contextKey = getPendingTerminalRecoveryContextKey?.() ?? null
     pendingTerminalRecoveryBudget.observeContext(contextKey)

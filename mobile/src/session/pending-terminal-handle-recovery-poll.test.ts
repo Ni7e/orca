@@ -46,7 +46,7 @@ function result(type?: TestResult['type']): TestResult {
 
 function makeHarness() {
   const requestTimes: number[] = []
-  const parkedContexts: Array<string | null> = []
+  const parkedContexts: (string | null)[] = []
   let contextKey: string | null = 'terminal-a'
   let otherRecoveryNeeded = false
   let connState: 'connected' | 'disconnected' = 'connected'
