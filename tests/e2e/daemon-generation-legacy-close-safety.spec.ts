@@ -141,7 +141,11 @@ function launchLegacyCloseClient(options: {
     ready,
     finish: async () => {
       if (!child.connected) {
-        throw new Error('Legacy close client IPC channel disconnected before finish handshake')
+        const disconnected: NodeJS.ErrnoException = new Error(
+          'Legacy close client IPC channel disconnected before finish handshake'
+        )
+        disconnected.code = 'ERR_IPC_CHANNEL_CLOSED'
+        throw disconnected
       }
       await new Promise<void>((resolve, reject) => {
         child.send({ type: 'finish' }, (error) => {
@@ -181,6 +185,11 @@ function legacyCloseClientExited(client: ReturnType<typeof launchLegacyCloseClie
   return client.child.exitCode !== null || client.child.signalCode !== null
 }
 
+function isIpcClosureError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null | undefined)?.code
+  return code === 'ERR_IPC_CHANNEL_CLOSED' || code === 'ERR_IPC_DISCONNECTED'
+}
+
 async function finishLegacyCloseClient(
   client: ReturnType<typeof launchLegacyCloseClient>
 ): Promise<void> {
@@ -196,9 +205,11 @@ async function finishLegacyCloseClient(
     finishError = error
     finishFailed = true
   }
+  let forcedCleanup = false
   try {
     await waitForCondition('legacy close client exit', () => legacyCloseClientExited(client), 2_000)
   } catch {
+    forcedCleanup = true
     try {
       await terminateLegacyCloseClient(client, identity)
     } catch (cleanupError) {
@@ -211,7 +222,8 @@ async function finishLegacyCloseClient(
       throw cleanupError
     }
   }
-  if (finishFailed) {
+  // Why: a normal client exit can close the IPC channel before the finish ack lands.
+  if (finishFailed && (forcedCleanup || !isIpcClosureError(finishError))) {
     throw finishError
   }
 }
