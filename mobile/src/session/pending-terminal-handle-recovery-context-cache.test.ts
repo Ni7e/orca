@@ -30,9 +30,12 @@ describe('PendingTerminalHandleRecoveryContextCache', () => {
   it('recomputes when the pending terminal identity changes', () => {
     const cache = new PendingTerminalHandleRecoveryContextCache()
     const first = terminalTab('terminal-a', null)
-    const second = { ...first, parentTabId: 'other-parent', leafId: 'other-leaf' }
+    const parentChanged = { ...first, parentTabId: 'other-parent' }
+    const leafChanged = { ...first, leafId: 'other-leaf' }
+    const firstKey = cache.read([first], first.id)
 
-    expect(cache.read([first], first.id)).not.toBe(cache.read([second], second.id))
+    expect(cache.read([parentChanged], parentChanged.id)).not.toBe(firstKey)
+    expect(cache.read([leafChanged], leafChanged.id)).not.toBe(firstKey)
   })
 
   it('does not rescan an unchanged context on the polling hot path', () => {
