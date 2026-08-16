@@ -25,7 +25,6 @@ export function ReviewerPickerRow({
 }): React.JSX.Element {
   return (
     <button
-      key={`${suggested ? 'suggested' : 'reviewer'}:${reviewer.login}`}
       type="button"
       disabled={disabled}
       aria-label={

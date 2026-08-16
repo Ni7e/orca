@@ -3,17 +3,14 @@ import { setPRFileViewedForRepo } from '@/components/github/github-work-item-com
 import { resolvePullRequestRepo } from '@/components/github/github-work-item-identity'
 import { translate } from '@/i18n/i18n'
 import type { GitHubPRFileViewedState } from '../../../../../shared/github/pull-request-types'
-import type {
-  GitHubWorkItem,
-  GitHubWorkItemDetails
-} from '../../../../../shared/github/work-item-types'
+import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'
 import type { PullRequestPageProjectOrigin } from '../page-types'
 import { patchCachedPRFileViewedState } from '../cache/work-item-details'
 
 export async function syncPullRequestFileViewed(args: {
   canUseDetailsRepoContext: boolean
-  details: GitHubWorkItemDetails | null
+  pullRequestId: string | undefined
   workItem: GitHubWorkItem | null
   effectiveRepoId: string | null
   path: string
@@ -26,7 +23,7 @@ export async function syncPullRequestFileViewed(args: {
 }): Promise<boolean> {
   if (
     !args.canUseDetailsRepoContext ||
-    !args.details?.pullRequestId ||
+    !args.pullRequestId ||
     !args.workItem ||
     args.workItem.type !== 'pr'
   ) {
@@ -62,7 +59,7 @@ export async function syncPullRequestFileViewed(args: {
       sourceContext: args.sourceContext,
       prNumber: args.workItem.number,
       prRepo: resolvePullRequestRepo(args.workItem, args.projectOrigin),
-      pullRequestId: args.details.pullRequestId,
+      pullRequestId: args.pullRequestId,
       path: args.path,
       viewed: args.viewed
     })

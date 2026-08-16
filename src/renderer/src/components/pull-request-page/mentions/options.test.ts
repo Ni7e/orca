@@ -37,11 +37,11 @@ describe('buildMentionOptions', () => {
     expect(options[2]?.name).toBe('Helper')
   })
 
-  it('skips ghost and fills missing avatar/name on a later duplicate login', () => {
+  it('skips ghost and fills missing avatar/name on a later case-insensitive duplicate login', () => {
     const options = buildMentionOptions({
       item,
-      comments: [comment('ghost'), comment('octocat', 'https://avatars/octocat')],
-      participants: [user('octocat', { name: 'Mona' })],
+      comments: [comment('ghost'), comment('Octocat', 'https://avatars/octocat')],
+      participants: [user('OCTOCAT', { name: 'Mona' })],
       assignableUsers: []
     })
 

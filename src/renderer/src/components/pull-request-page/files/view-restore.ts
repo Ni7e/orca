@@ -55,26 +55,32 @@ export function usePRFilesDiffViewPersistence(args: {
       return
     }
 
-    const updateCachedScrollPosition = (): void => {
+    const writeCachedScrollPosition = (scrollTop: number): void => {
+      const existing = prFilesDiffViewStateCache.get(args.viewStateKey)
+      setWithLRU(prFilesDiffScrollTopCache, args.viewStateKey, scrollTop)
+      if (!existing || existing.entrySignature !== args.entrySignature) {
+        return
+      }
+      setWithLRU(prFilesDiffViewStateCache, args.viewStateKey, { ...existing, scrollTop })
+    }
+
+    const cacheScrollPositionOnScroll = (): void => {
       // Why: mid-restore scrollTop is a clamped intermediate, so caching it would lose the real target.
       if (args.pendingRestoreScrollTopRef.current !== null) {
         return
       }
-      const existing = prFilesDiffViewStateCache.get(args.viewStateKey)
-      setWithLRU(prFilesDiffScrollTopCache, args.viewStateKey, container.scrollTop)
-      if (!existing || existing.entrySignature !== args.entrySignature) {
-        return
-      }
-      setWithLRU(prFilesDiffViewStateCache, args.viewStateKey, {
-        ...existing,
-        scrollTop: container.scrollTop
-      })
+      writeCachedScrollPosition(container.scrollTop)
     }
 
-    container.addEventListener('scroll', updateCachedScrollPosition)
+    const cacheScrollPositionOnTeardown = (): void => {
+      // Why: tearing down mid-restore must persist the pending target, not the clamped intermediate.
+      writeCachedScrollPosition(args.pendingRestoreScrollTopRef.current ?? container.scrollTop)
+    }
+
+    container.addEventListener('scroll', cacheScrollPositionOnScroll)
     return () => {
-      updateCachedScrollPosition()
-      container.removeEventListener('scroll', updateCachedScrollPosition)
+      cacheScrollPositionOnTeardown()
+      container.removeEventListener('scroll', cacheScrollPositionOnScroll)
     }
   }, [
     args.entrySignature,
@@ -115,7 +121,8 @@ export function usePRFilesDiffViewPersistence(args: {
         frameId = window.requestAnimationFrame(restoreScrollPosition)
         return
       }
-      // Why: give up rather than block scroll caching forever when the content never grows enough.
+      // Why: cache what we actually reached; an unreachable target would replay this fight every visit.
+      setWithLRU(prFilesDiffScrollTopCache, args.viewStateKey, liveContainer.scrollTop)
       args.pendingRestoreScrollTopRef.current = null
     }
 

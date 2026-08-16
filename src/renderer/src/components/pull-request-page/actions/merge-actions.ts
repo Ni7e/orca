@@ -86,12 +86,19 @@ export async function changePullRequestState(args: {
     args.onMutated()
   } catch (err) {
     args.applyStatePatch(previousState)
+    // Why: full sentences per state — interpolating the localized verb into a template mangles other locales.
     toast.error(
       err instanceof Error
         ? err.message
-        : translate('auto.components.PullRequestPage.b8c6cbb8c4', 'Failed to {{value0}} PR', {
-            value0: label.toLowerCase()
-          })
+        : args.nextState === 'closed'
+          ? translate(
+              'auto.components.PullRequestPage.closePullRequestFailed',
+              'Failed to close pull request'
+            )
+          : translate(
+              'auto.components.PullRequestPage.reopenPullRequestFailed',
+              'Failed to reopen pull request'
+            )
     )
   } finally {
     args.setStatePending(false)

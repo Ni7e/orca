@@ -12,6 +12,7 @@ import {
 import type { CheckDetailsLoadState } from '@/components/github-checks-tab-state'
 import { translate } from '@/i18n/i18n'
 import type { PRCheckDetail } from '../../../../../shared/github/check-types'
+import { assignUniqueListKeys } from './details-list-keys'
 
 export function CheckDetailsPanel({
   check,
@@ -32,8 +33,21 @@ export function CheckDetailsPanel({
     conclusion: (details?.conclusion as PRCheckDetail['conclusion'] | undefined) ?? check.conclusion
   }
   const hasOutput = Boolean(details?.title || details?.summary || details?.text)
-  const hasAnnotations = (details?.annotations.length ?? 0) > 0
-  const hasJobs = (details?.jobs.length ?? 0) > 0
+  const annotationRows = assignUniqueListKeys(details?.annotations ?? [], (annotation) =>
+    [
+      annotation.path ?? 'annotation',
+      annotation.startLine ?? '',
+      annotation.endLine ?? '',
+      annotation.annotationLevel ?? '',
+      annotation.title ?? '',
+      annotation.message
+    ].join('\0')
+  )
+  const jobRows = assignUniqueListKeys(details?.jobs ?? [], (job) =>
+    job.id === null || job.id === undefined ? `name:${job.name}` : `id:${job.id}`
+  )
+  const hasAnnotations = annotationRows.length > 0
+  const hasJobs = jobRows.length > 0
 
   return (
     <div className="mx-2 mb-2 mt-1 min-w-0 rounded-md border border-border/50 bg-muted/20 px-3 py-2">
@@ -115,9 +129,9 @@ export function CheckDetailsPanel({
                 {translate('auto.components.PullRequestPage.8432d17901', 'Annotations')}
               </div>
               <div className="flex flex-col">
-                {details!.annotations.map((annotation, index) => (
+                {annotationRows.map(({ item: annotation, key }, index) => (
                   <div
-                    key={`${annotation.path ?? 'annotation'}-${annotation.startLine ?? ''}-${annotation.endLine ?? ''}-${annotation.annotationLevel ?? ''}-${annotation.title ?? ''}-${annotation.message}-${annotation.rawDetails ?? ''}`}
+                    key={key}
                     className={cn(
                       'min-w-0 px-2.5 py-2 text-[12px]',
                       index > 0 && 'border-t border-border/30'
@@ -160,9 +174,9 @@ export function CheckDetailsPanel({
                 {translate('auto.components.PullRequestPage.7720c9c3f5', 'Jobs')}
               </div>
               <div className="flex flex-col">
-                {details!.jobs.map((job, index) => (
+                {jobRows.map(({ item: job, key }, index) => (
                   <div
-                    key={job.id ?? `${job.name}-${job.startedAt ?? ''}`}
+                    key={key}
                     className={cn('min-w-0 px-2.5 py-2', index > 0 && 'border-t border-border/30')}
                   >
                     <div className="flex min-w-0 items-center gap-2">

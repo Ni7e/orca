@@ -284,7 +284,7 @@ export default function PullRequestPage({
     async (path: string, viewed: boolean): Promise<boolean> =>
       syncPullRequestFileViewed({
         canUseDetailsRepoContext,
-        details,
+        pullRequestId: details?.pullRequestId,
         workItem,
         effectiveRepoId,
         path,
@@ -297,7 +297,7 @@ export default function PullRequestPage({
       }),
     [
       canUseDetailsRepoContext,
-      details,
+      details?.pullRequestId,
       detailsCacheKey,
       effectiveRepoId,
       projectOrigin,

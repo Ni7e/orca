@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: switching PRs re-seeds the whole diff view (sections, heights, scroll target, cached loaded set) from the persisted cache, which cannot be derived during render. */
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { editor as monacoEditor } from 'monaco-editor'
@@ -136,8 +137,8 @@ export function PRFilesCombinedDiffViewer({
     loadedIndicesRef.current.clear()
     loadingIndicesRef.current.clear()
     pendingRestoreScrollTopRef.current = prFilesDiffScrollTopCache.get(viewStateKey) ?? null
-    setSectionHeights(entries.length > 0 ? {} : {})
-    setActiveTreeSectionKey(entries.length > 0 ? null : null)
+    setSectionHeights({})
+    setActiveTreeSectionKey(null)
     setSections(
       entries.map((entry) => ({
         key: getPRFileSectionKey(entry.path),

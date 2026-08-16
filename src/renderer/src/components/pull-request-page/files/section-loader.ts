@@ -19,6 +19,34 @@ import type {
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'
 import { loadPRFileContents } from '../cache/file-content'
 
+// Why: the local IPC path carries no timeout, so a wedged host would leave the section spinning
+// forever with no error and therefore no retry button. Above the 30s remote RPC timeout so a
+// remote failure still surfaces its own message.
+const PR_FILE_DIFF_LOAD_TIMEOUT_MS = 45_000
+
+function rejectAfterLoadTimeout<T>(promise: Promise<T>): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | null = null
+  return new Promise<T>((resolve, reject) => {
+    timeout = setTimeout(
+      () =>
+        reject(
+          new Error(
+            translate(
+              'auto.components.PullRequestPage.diffLoadTimedOut',
+              'Timed out loading this diff.'
+            )
+          )
+        ),
+      PR_FILE_DIFF_LOAD_TIMEOUT_MS
+    )
+    promise.then(resolve, reject)
+  }).finally(() => {
+    if (timeout) {
+      clearTimeout(timeout)
+    }
+  })
+}
+
 export function usePRFileSectionLoader(args: {
   sectionsRef: MutableRefObject<DiffSection[]>
   loadedIndicesRef: MutableRefObject<Set<number>>
@@ -103,16 +131,18 @@ export function usePRFileSectionLoader(args: {
             )
           }
         }
-        const contents = await loadPRFileContents({
-          repoPath,
-          repoId,
-          sourceContext,
-          prNumber,
-          prRepo,
-          file,
-          headSha,
-          baseSha
-        })
+        const contents = await rejectAfterLoadTimeout(
+          loadPRFileContents({
+            repoPath,
+            repoId,
+            sourceContext,
+            prNumber,
+            prRepo,
+            file,
+            headSha,
+            baseSha
+          })
+        )
         return { result: getPRFileDiffResult(contents), resultContents: contents }
       }
 
