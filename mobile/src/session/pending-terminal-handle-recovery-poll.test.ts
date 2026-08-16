@@ -1,5 +1,5 @@
 import { createElement } from 'react'
-import { act, create, type ReactTestRenderer } from 'react-test-renderer'
+import { act, create } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcSuccess } from '../transport/types'
@@ -119,7 +119,7 @@ async function flush(): Promise<void> {
 }
 
 describe('bounded pending-handle reconciliation cadence', () => {
-  let renderer: ReactTestRenderer | null = null
+  let renderer: ReturnType<typeof create> | null = null
 
   beforeEach(() => {
     vi.useFakeTimers()
@@ -139,6 +139,8 @@ describe('bounded pending-handle reconciliation cadence', () => {
     await act(async () => {
       renderer = create(createElement(harness.Harness))
       await flush()
+    })
+    await act(async () => {
       harness.emit(result('snapshot'))
       await flush()
       harness.emit(result('updated'))
@@ -239,6 +241,9 @@ describe('bounded pending-handle reconciliation cadence', () => {
     await setAppState('background')
     await setAppState('active')
     expect(harness.requestTimes).toHaveLength(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS + 1)
+    await advance(2000)
+    expect(harness.requestTimes).toHaveLength(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS + 2)
+    await advance(10_000)
 
     harness.setConnectionState('disconnected')
     await act(async () => {
@@ -249,6 +254,8 @@ describe('bounded pending-handle reconciliation cadence', () => {
     await act(async () => {
       renderer?.update(createElement(harness.Harness))
       await flush()
+    })
+    await act(async () => {
       harness.emit(result('updated'))
       await flush()
     })

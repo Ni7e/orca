@@ -48,7 +48,7 @@ export function getPendingTerminalHandleRecoveryContextKey(
   if (active?.type !== 'terminal' || typeof active.terminal === 'string') {
     return null
   }
-  return `${active.id}:${active.parentTabId}:${active.leafId ?? ''}`
+  return JSON.stringify([active.id, active.parentTabId, active.leafId ?? null])
 }
 
 /**

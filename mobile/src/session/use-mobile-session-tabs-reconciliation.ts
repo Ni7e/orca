@@ -194,7 +194,7 @@ export function useMobileSessionTabsReconciliation<Result, Tab>({
     ),
     retryPendingTerminalRecovery: useCallback(() => {
       resetPendingTerminalRecovery()
-      return controller?.requestReconciliation() ?? resolved
+      return controller?.retryReconciliation() ?? resolved
     }, [controller, resetPendingTerminalRecovery])
   }
 }

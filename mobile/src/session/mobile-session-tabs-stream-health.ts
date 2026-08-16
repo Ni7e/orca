@@ -85,17 +85,31 @@ export class MobileSessionTabsStreamHealth<Result, Tab> {
     return this.requestReconciliation()
   }
 
+  retryReconciliation(): Promise<void> {
+    this.syncGeneration()
+    this.requirementRevision += 1
+    const key = `${this.generation}:${this.barrier}`
+    if (this.inFlight.has(key)) {
+      this.barrier += 1
+    }
+    return this.startCurrentRequest()
+  }
+
   poll(): Promise<void> | null {
     this.syncGeneration()
     if (!this.reconciliationActive) {
       return null
     }
     const recoveryNeeded = this.options.hasRecoveryNeed()
-    if (recoveryNeeded && this.options.allowRecoveryPoll?.() === false) {
-      return null
-    }
     if (this.health === 'live') {
       if (!recoveryNeeded && this.requirementRevision <= this.satisfiedRevision) {
+        return null
+      }
+      const currentRequest = this.inFlight.get(`${this.generation}:${this.barrier}`)
+      if (currentRequest) {
+        return currentRequest.promise
+      }
+      if (recoveryNeeded && this.options.allowRecoveryPoll?.() === false) {
         return null
       }
     }
