@@ -2293,17 +2293,15 @@ export default function SessionScreen() {
       nativeChatStream.hasTabsRecoveryNeed(),
     [nativeChatStream]
   )
-  const getPendingTerminalRecoveryContextKey = useCallback(
-    () =>
-      getPendingTerminalHandleRecoveryContextKey(
-        sessionTabsRef.current,
-        activeSessionTabIdRef.current
-      ),
-    []
+  const pendingTerminalRecoveryContextKey = useMemo(
+    () => getPendingTerminalHandleRecoveryContextKey(sessionTabs, activeSessionTabId),
+    [activeSessionTabId, sessionTabs]
   )
-  const pendingTerminalRecoveryContextKey = getPendingTerminalHandleRecoveryContextKey(
-    sessionTabs,
-    activeSessionTabId
+  const pendingTerminalRecoveryContextKeyRef = useRef(pendingTerminalRecoveryContextKey)
+  pendingTerminalRecoveryContextKeyRef.current = pendingTerminalRecoveryContextKey
+  const getPendingTerminalRecoveryContextKey = useCallback(
+    () => pendingTerminalRecoveryContextKeyRef.current,
+    []
   )
   const getSessionTabsApplicationRevision = useCallback(
     () => appliedSessionTabsRevisionRef.current,
@@ -4093,13 +4091,9 @@ export default function SessionScreen() {
     activeSessionTab?.type === 'terminal' && typeof activeSessionTab.terminal !== 'string'
       ? activeSessionTab
       : null
-  const activePendingTerminalContext = getPendingTerminalHandleRecoveryContextKey(
-    sessionTabs,
-    activeSessionTabId
-  )
   const isPendingTerminalRecoveryParked =
-    activePendingTerminalContext !== null &&
-    activePendingTerminalContext === parkedPendingTerminalContext
+    pendingTerminalRecoveryContextKey !== null &&
+    pendingTerminalRecoveryContextKey === parkedPendingTerminalContext
 
   useEffect(() => {
     if (!client || connState !== 'connected' || !activePendingTerminalTab) {

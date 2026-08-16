@@ -188,9 +188,9 @@ describe('mobile session startup', () => {
   })
 
   it('wires pending-handle recovery through its bounded context (STA-4256)', () => {
-    expect(source).toContain('getPendingTerminalHandleRecoveryContextKey(')
-    expect(source).toContain('sessionTabsRef.current')
-    expect(source).toContain('activeSessionTabIdRef.current')
+    expect(source.match(/getPendingTerminalHandleRecoveryContextKey\(/g)).toHaveLength(1)
+    expect(source).toContain('const pendingTerminalRecoveryContextKey = useMemo(')
+    expect(source).toContain('() => pendingTerminalRecoveryContextKeyRef.current')
     expect(source).toContain('hasRecoveryNeed: hasSessionTabsRecoveryNeed')
     expect(source).toContain('getPendingTerminalRecoveryContextKey,')
     expect(source).toContain('onPendingTerminalRecoveryParked: setParkedPendingTerminalContext')
