@@ -49,7 +49,8 @@ describe('PendingTerminalHandleRecoveryContextCache', () => {
 
     const contextKey = cache.read(tabs, 'terminal-a')
     const readsAfterFirstLookup = idReads
+    expect(readsAfterFirstLookup).toBe(2)
     expect(cache.read(tabs, 'terminal-a')).toBe(contextKey)
-    expect(idReads).toBe(readsAfterFirstLookup)
+    expect(idReads).toBe(2)
   })
 })

@@ -188,11 +188,28 @@ describe('mobile session startup', () => {
   })
 
   it('wires pending-handle recovery through its bounded context (STA-4256)', () => {
+    const applySessionTabs = sliceBetween(
+      'const applySessionTabs = useCallback(',
+      'const consumeAcceptedSessionTabs = useCallback('
+    )
     const recoveryContext = sliceBetween(
       'const pendingTerminalRecoveryContextCache = useMemo(',
       'const getSessionTabsApplicationRevision'
     )
 
+    const tabsRefWrite = 'sessionTabsRef.current = nextTabs'
+    const tabsStateWrite = 'setSessionTabs((prev)'
+    const activeRefWrite = 'activeSessionTabIdRef.current = active?.id ?? null'
+    const activeStateWrite = 'setActiveSessionTabId(active?.id ?? null)'
+    for (const write of [tabsRefWrite, tabsStateWrite, activeRefWrite, activeStateWrite]) {
+      expect(applySessionTabs).toContain(write)
+    }
+    expect(applySessionTabs.indexOf(tabsRefWrite)).toBeLessThan(
+      applySessionTabs.indexOf(tabsStateWrite)
+    )
+    expect(applySessionTabs.indexOf(activeRefWrite)).toBeLessThan(
+      applySessionTabs.indexOf(activeStateWrite)
+    )
     expect(recoveryContext).toContain('() => new PendingTerminalHandleRecoveryContextCache()')
     expect(recoveryContext).toContain('sessionTabsRef.current,')
     expect(recoveryContext).toContain('activeSessionTabIdRef.current')
