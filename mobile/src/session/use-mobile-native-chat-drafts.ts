@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
 import {
-  countImageSourceTurnsAfter,
   countUserTextOccurrences,
   findLandedImagePreviewEchoes,
   findLandedUnconfirmedSends,
   mergeLandedImagePreviewEchoes,
   migrateImagePreviewMessageIds,
   normalizeReconcileText,
-  normalizedUserText,
   type UnconfirmedSend
 } from './mobile-native-chat-draft-reconcile'
+import { rebaseMobileNativeChatPendingBaselines } from './mobile-native-chat-pending-baseline'
+import { retireLandedMobileNativeChatPending } from './mobile-native-chat-pending-retirement'
 import {
   appendMobileNativeChatPending,
   combineMobileNativeChatPending,
@@ -138,10 +138,13 @@ export function useMobileNativeChatDrafts(args: {
         pendingKey,
         normalizedText,
         baselineOccurrences: countUserTextOccurrences(messagesRef.current, normalizedText),
-        baselineTailMessageId: messagesRef.current.at(-1)?.id ?? null
+        baselineTailMessageId: messagesRef.current.at(-1)?.id ?? null,
+        // A hydrating transcript is not yet this session's, so this baseline is
+        // a placeholder the first authoritative read rebases.
+        baselineResolved: !transcriptLoading
       }
     },
-    [draftKey, pendingKey]
+    [draftKey, pendingKey, transcriptLoading]
   )
 
   // Why: over relay the send RPC can take seconds (or lose only its ack), and a
@@ -291,28 +294,13 @@ export function useMobileNativeChatDrafts(args: {
     }
     setPendingBySession((previous) => {
       const current = previous[pendingKey] ?? []
-      const landedCounts = new Map<string, number>()
-      for (const message of messages) {
-        const text = normalizedUserText(message)
-        if (text) {
-          landedCounts.set(text, (landedCounts.get(text) ?? 0) + 1)
-        }
-      }
-      // Image-only source-turn counts stay stable across reruns and ignore paginated history.
-      const next = current.filter((item) => {
-        if (landedImagePendingIds.has(item.id)) {
-          return false
-        }
-        // Keep image echoes until their local preview reaches the authoritative message.
-        if (item.images?.length) {
-          return true
-        }
-        return item.text.trim() === ''
-          ? countImageSourceTurnsAfter(messages, item.baselineTailMessageId) <
-              item.expectedOccurrence
-          : (landedCounts.get(normalizeReconcileText(item.text)) ?? 0) < item.expectedOccurrence
-      })
-      if (next.length === current.length) {
+      // Rebase before retiring: a hydration-time send has to own a real boundary
+      // before any row can be judged against it.
+      const rebased = transcriptLoading
+        ? current
+        : rebaseMobileNativeChatPendingBaselines(messages, current)
+      const next = retireLandedMobileNativeChatPending(messages, rebased, landedImagePendingIds)
+      if (next === current) {
         return previous
       }
       if (next.length > 0) {
@@ -322,7 +310,7 @@ export function useMobileNativeChatDrafts(args: {
       delete remaining[pendingKey]
       return remaining
     })
-  }, [messages, pending, pendingKey])
+  }, [messages, pending, pendingKey, transcriptLoading])
 
   return {
     composerText: draftKey ? (drafts[draftKey] ?? '') : '',
