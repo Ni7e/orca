@@ -37,6 +37,24 @@ export class PendingTerminalHandleRecoveryBudget {
   }
 }
 
+export class PendingTerminalHandleRecoveryContextCache {
+  private activeTabId: string | null = null
+  private contextKey: string | null = null
+  private initialized = false
+  private tabs: readonly MobileSessionTab[] | null = null
+
+  read(tabs: readonly MobileSessionTab[], activeTabId: string | null): string | null {
+    if (this.initialized && tabs === this.tabs && activeTabId === this.activeTabId) {
+      return this.contextKey
+    }
+    this.initialized = true
+    this.tabs = tabs
+    this.activeTabId = activeTabId
+    this.contextKey = getPendingTerminalHandleRecoveryContextKey(tabs, activeTabId)
+    return this.contextKey
+  }
+}
+
 export function getPendingTerminalHandleRecoveryContextKey(
   tabs: readonly MobileSessionTab[],
   activeTabId: string | null

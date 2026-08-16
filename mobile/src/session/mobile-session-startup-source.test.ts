@@ -188,9 +188,17 @@ describe('mobile session startup', () => {
   })
 
   it('wires pending-handle recovery through its bounded context (STA-4256)', () => {
-    expect(source.match(/getPendingTerminalHandleRecoveryContextKey\(/g)).toHaveLength(1)
-    expect(source).toContain('const pendingTerminalRecoveryContextKey = useMemo(')
-    expect(source).toContain('() => pendingTerminalRecoveryContextKeyRef.current')
+    const recoveryContext = sliceBetween(
+      'const pendingTerminalRecoveryContextCache = useMemo(',
+      'const getSessionTabsApplicationRevision'
+    )
+
+    expect(recoveryContext).toContain('() => new PendingTerminalHandleRecoveryContextCache()')
+    expect(recoveryContext).toContain('sessionTabsRef.current,')
+    expect(recoveryContext).toContain('activeSessionTabIdRef.current')
+    expect(recoveryContext).toContain(
+      'const pendingTerminalRecoveryContextKey = getPendingTerminalRecoveryContextKey()'
+    )
     expect(source).toContain('hasRecoveryNeed: hasSessionTabsRecoveryNeed')
     expect(source).toContain('getPendingTerminalRecoveryContextKey,')
     expect(source).toContain('onPendingTerminalRecoveryParked: setParkedPendingTerminalContext')

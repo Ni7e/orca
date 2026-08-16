@@ -253,7 +253,7 @@ import type {
 } from '../../../../src/session/mobile-session-tabs-stream-health'
 import { useMobileSessionTabsFetchReporting } from '../../../../src/session/use-mobile-session-tabs-fetch-reporting'
 import { useMobileSessionTabsReconciliation } from '../../../../src/session/use-mobile-session-tabs-reconciliation'
-import { getPendingTerminalHandleRecoveryContextKey } from '../../../../src/session/pending-terminal-handle-recovery'
+import { PendingTerminalHandleRecoveryContextCache } from '../../../../src/session/pending-terminal-handle-recovery'
 import {
   getRepoIdFromMobileWorktreeId,
   getActiveTabIdForHandle,
@@ -2293,16 +2293,19 @@ export default function SessionScreen() {
       nativeChatStream.hasTabsRecoveryNeed(),
     [nativeChatStream]
   )
-  const pendingTerminalRecoveryContextKey = useMemo(
-    () => getPendingTerminalHandleRecoveryContextKey(sessionTabs, activeSessionTabId),
-    [activeSessionTabId, sessionTabs]
-  )
-  const pendingTerminalRecoveryContextKeyRef = useRef(pendingTerminalRecoveryContextKey)
-  pendingTerminalRecoveryContextKeyRef.current = pendingTerminalRecoveryContextKey
-  const getPendingTerminalRecoveryContextKey = useCallback(
-    () => pendingTerminalRecoveryContextKeyRef.current,
+  const pendingTerminalRecoveryContextCache = useMemo(
+    () => new PendingTerminalHandleRecoveryContextCache(),
     []
   )
+  const getPendingTerminalRecoveryContextKey = useCallback(
+    () =>
+      pendingTerminalRecoveryContextCache.read(
+        sessionTabsRef.current,
+        activeSessionTabIdRef.current
+      ),
+    [pendingTerminalRecoveryContextCache]
+  )
+  const pendingTerminalRecoveryContextKey = getPendingTerminalRecoveryContextKey()
   const getSessionTabsApplicationRevision = useCallback(
     () => appliedSessionTabsRevisionRef.current,
     []

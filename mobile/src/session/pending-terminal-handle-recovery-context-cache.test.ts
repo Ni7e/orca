@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest'
+import type { MobileSessionTab } from './mobile-session-route-types'
+import { PendingTerminalHandleRecoveryContextCache } from './pending-terminal-handle-recovery'
+
+function terminalTab(id: string, terminal: string | null): MobileSessionTab {
+  return {
+    type: 'terminal',
+    id,
+    title: 'zsh',
+    parentTabId: 'parent',
+    leafId: 'leaf',
+    status: terminal === null ? 'pending-handle' : 'ready',
+    terminal,
+    isActive: true
+  }
+}
+
+describe('PendingTerminalHandleRecoveryContextCache', () => {
+  it('reads authoritative tab refs before the next render', () => {
+    const cache = new PendingTerminalHandleRecoveryContextCache()
+    const pendingTabs = [terminalTab('terminal-a', null)]
+    const readyTabs = [terminalTab('terminal-a', 'pty-a')]
+
+    expect(cache.read(pendingTabs, 'terminal-a')).not.toBeNull()
+    expect(cache.read(readyTabs, 'terminal-a')).toBeNull()
+    expect(cache.read(pendingTabs, null)).toBeNull()
+    expect(cache.read(pendingTabs, 'terminal-a')).not.toBeNull()
+  })
+
+  it('recomputes when the pending terminal identity changes', () => {
+    const cache = new PendingTerminalHandleRecoveryContextCache()
+    const first = terminalTab('terminal-a', null)
+    const second = { ...first, parentTabId: 'other-parent', leafId: 'other-leaf' }
+
+    expect(cache.read([first], first.id)).not.toBe(cache.read([second], second.id))
+  })
+
+  it('does not rescan an unchanged context on the polling hot path', () => {
+    let idReads = 0
+    const tab = terminalTab('terminal-a', null)
+    Object.defineProperty(tab, 'id', {
+      get: () => {
+        idReads += 1
+        return 'terminal-a'
+      }
+    })
+    const tabs = [tab]
+    const cache = new PendingTerminalHandleRecoveryContextCache()
+
+    const contextKey = cache.read(tabs, 'terminal-a')
+    const readsAfterFirstLookup = idReads
+    expect(cache.read(tabs, 'terminal-a')).toBe(contextKey)
+    expect(idReads).toBe(readsAfterFirstLookup)
+  })
+})
