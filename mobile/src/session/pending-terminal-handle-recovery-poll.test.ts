@@ -48,6 +48,7 @@ function makeHarness() {
   const requestTimes: number[] = []
   const parkedContexts: Array<string | null> = []
   let contextKey: string | null = 'terminal-a'
+  let otherRecoveryNeeded = false
   let connState: 'connected' | 'disconnected' = 'connected'
   let streamListener: ((payload: unknown) => void) | null = null
   let actions: ReturnType<typeof useMobileSessionTabsReconciliation<TestResult, string>> | null =
@@ -71,7 +72,7 @@ function makeHarness() {
   const consumeAcceptedSessionTabs = () => {}
   const fetchTerminals = async () => {}
   const getPendingTerminalRecoveryContextKey = () => contextKey
-  const hasRecoveryNeed = () => false
+  const hasRecoveryNeed = () => otherRecoveryNeeded
   const onPendingTerminalRecoveryParked = (key: string | null) => parkedContexts.push(key)
   const applySessionTabs = (value: TestResult): SessionTabsApplyOutcome<string> => ({
     accepted: true,
@@ -108,6 +109,9 @@ function makeHarness() {
     },
     setContextKey(value: string | null) {
       contextKey = value
+    },
+    setOtherRecoveryNeeded(value: boolean) {
+      otherRecoveryNeeded = value
     }
   }
 }
@@ -231,6 +235,24 @@ describe('bounded pending-handle reconciliation cadence', () => {
     expect(harness.parkedContexts.at(-1)).toBe('terminal-a')
     await advance(2000)
     expect(harness.requestTimes).toHaveLength(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS)
+  })
+
+  it('does not charge other recovery sources to the pending-terminal budget', async () => {
+    const harness = makeHarness()
+    await mount(harness)
+    await advance(12_000)
+    expect(harness.requestTimes).toEqual([2000, 4000, 6000, 8000, 10_000])
+
+    harness.setContextKey(null)
+    harness.setOtherRecoveryNeeded(true)
+    await advance(14_000)
+    expect(harness.requestTimes).toEqual([
+      2000, 4000, 6000, 8000, 10_000, 14_000, 16_000, 18_000, 20_000, 22_000, 24_000, 26_000
+    ])
+
+    harness.setOtherRecoveryNeeded(false)
+    await advance(2000)
+    expect(harness.requestTimes).toHaveLength(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS + 7)
   })
 
   it('resets after foregrounding, reconnecting, and explicit retry', async () => {
