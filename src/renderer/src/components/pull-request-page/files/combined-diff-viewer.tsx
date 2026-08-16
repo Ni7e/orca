@@ -26,7 +26,6 @@ import {
   type PRFilesCombinedDiffViewerProps
 } from '@/components/github/pr-file-diff-mapping'
 import { githubRepoIdentityKey } from '../../../../../shared/github/repository-identity-key'
-import type { GitBranchChangeEntry } from '../../../../../shared/git-diff-compare-types'
 import { prFilesDiffScrollTopCache, prFilesDiffViewStateCache } from '../cache/files-diff-view'
 import { PRFilesDiffToolbar } from './toolbar'
 import { addPullRequestLineComment } from './line-comment'
@@ -53,10 +52,6 @@ export function PRFilesCombinedDiffViewer({
   const isDark =
     settings?.theme === 'dark' ||
     (settings?.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  const entriesCacheRef = useRef<{
-    signature: string
-    entries: GitBranchChangeEntry[]
-  } | null>(null)
   const diffEntrySignature = useMemo(
     () =>
       JSON.stringify(
@@ -71,20 +66,14 @@ export function PRFilesCombinedDiffViewer({
       ),
     [files]
   )
-  const entries = useMemo(() => {
-    if (entriesCacheRef.current?.signature === diffEntrySignature) {
-      return entriesCacheRef.current.entries
-    }
-    const nextEntries = getCombinedDiffBranchEntriesInTreeOrder(
-      'commit',
-      files.map(gitHubPRFileToBranchEntry)
-    )
-    entriesCacheRef.current = {
-      signature: diffEntrySignature,
-      entries: nextEntries
-    }
-    return nextEntries
-  }, [diffEntrySignature, files])
+  const entries = useMemo(
+    () => getCombinedDiffBranchEntriesInTreeOrder('commit', files.map(gitHubPRFileToBranchEntry)),
+    // Why: diffEntrySignature captures every file field that feeds the branch entries,
+    // so memoizing on it (not the files array identity) preserves the old ref-cache
+    // dedupe without writing a ref during render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [diffEntrySignature]
+  )
   const fileByPath = useMemo(() => new Map(files.map((file) => [file.path, file])), [files])
   const inlineReviewComments = useMemo(
     () => buildInlineReviewComments(comments, repoId, prNumber),
@@ -119,7 +108,10 @@ export function PRFilesCombinedDiffViewer({
   const generationRef = useRef(0)
   const modifiedEditorsRef = useRef<Map<number, monacoEditor.IStandaloneCodeEditor>>(new Map())
   const handleSectionSaveRef = useRef<(index: number) => Promise<void>>(async () => {})
-  sectionsRef.current = sections
+  useLayoutEffect(() => {
+    // Why: keep the loader/navigation callbacks reading the latest sections without a render-phase ref write.
+    sectionsRef.current = sections
+  })
 
   useEffect(() => {
     // Why: bump generation so stale async diff loads from the previous view can't patch the restored sections.
@@ -144,8 +136,8 @@ export function PRFilesCombinedDiffViewer({
     loadedIndicesRef.current.clear()
     loadingIndicesRef.current.clear()
     pendingRestoreScrollTopRef.current = prFilesDiffScrollTopCache.get(viewStateKey) ?? null
-    setSectionHeights({})
-    setActiveTreeSectionKey(null)
+    setSectionHeights(entries.length > 0 ? {} : {})
+    setActiveTreeSectionKey(entries.length > 0 ? null : null)
     setSections(
       entries.map((entry) => ({
         key: getPRFileSectionKey(entry.path),

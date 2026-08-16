@@ -40,21 +40,37 @@ export function usePRFileSectionLoader(args: {
   toggleSection: (index: number) => void
   setAllSectionsCollapsed: (collapsed: boolean) => void
 } {
+  const {
+    sectionsRef,
+    loadedIndicesRef,
+    loadingIndicesRef,
+    generationRef,
+    fileByPath,
+    repoPath,
+    repoId,
+    sourceContext,
+    prNumber,
+    prRepo,
+    headSha,
+    baseSha,
+    setSections,
+    setSectionHeights
+  } = args
   const loadSection = useCallback(
     (index: number) => {
-      const section = args.sectionsRef.current[index]
+      const section = sectionsRef.current[index]
       if (!section || section.collapsed) {
         return
       }
-      if (args.loadedIndicesRef.current.has(index) || args.loadingIndicesRef.current.has(index)) {
+      if (loadedIndicesRef.current.has(index) || loadingIndicesRef.current.has(index)) {
         return
       }
-      const file = args.fileByPath.get(section.path)
+      const file = fileByPath.get(section.path)
       if (!file) {
         return
       }
-      const generation = args.generationRef.current
-      args.loadingIndicesRef.current.add(index)
+      const generation = generationRef.current
+      loadingIndicesRef.current.add(index)
 
       const load = async (): Promise<{
         result: GitDiffResult
@@ -72,7 +88,7 @@ export function usePRFileSectionLoader(args: {
             }
           }
         }
-        if (!args.headSha || !args.baseSha) {
+        if (!headSha || !baseSha) {
           return {
             result: {
               kind: 'text',
@@ -88,14 +104,14 @@ export function usePRFileSectionLoader(args: {
           }
         }
         const contents = await loadPRFileContents({
-          repoPath: args.repoPath,
-          repoId: args.repoId,
-          sourceContext: args.sourceContext,
-          prNumber: args.prNumber,
-          prRepo: args.prRepo,
+          repoPath,
+          repoId,
+          sourceContext,
+          prNumber,
+          prRepo,
           file,
-          headSha: args.headSha,
-          baseSha: args.baseSha
+          headSha,
+          baseSha
         })
         return { result: getPRFileDiffResult(contents), resultContents: contents }
       }
@@ -113,8 +129,8 @@ export function usePRFileSectionLoader(args: {
           error: error instanceof Error ? error.message : 'Failed to load diff.'
         }))
         .then(({ result, resultContents, error }) => {
-          args.loadingIndicesRef.current.delete(index)
-          if (args.generationRef.current !== generation) {
+          loadingIndicesRef.current.delete(index)
+          if (generationRef.current !== generation) {
             return
           }
           const largeDiffRenderLimit =
@@ -123,8 +139,8 @@ export function usePRFileSectionLoader(args: {
               : null
           const storedContent = getStoredTextDiffContent(result, largeDiffRenderLimit)
           const storedResult = getStoredTextDiffResult(result, largeDiffRenderLimit)
-          args.loadedIndicesRef.current.add(index)
-          args.setSections((prev) =>
+          loadedIndicesRef.current.add(index)
+          setSections((prev) =>
             prev.map((current, currentIndex) =>
               currentIndex === index
                 ? {
@@ -142,28 +158,28 @@ export function usePRFileSectionLoader(args: {
         })
     },
     [
-      args.baseSha,
-      args.fileByPath,
-      args.headSha,
-      args.prNumber,
-      args.prRepo,
-      args.repoId,
-      args.repoPath,
-      args.sourceContext,
-      args.generationRef,
-      args.loadedIndicesRef,
-      args.loadingIndicesRef,
-      args.sectionsRef,
-      args.setSections
+      baseSha,
+      fileByPath,
+      headSha,
+      prNumber,
+      prRepo,
+      repoId,
+      repoPath,
+      sourceContext,
+      generationRef,
+      loadedIndicesRef,
+      loadingIndicesRef,
+      sectionsRef,
+      setSections
     ]
   )
 
   const retrySection = useCallback(
     (index: number) => {
-      args.loadedIndicesRef.current.delete(index)
-      args.loadingIndicesRef.current.delete(index)
-      args.setSectionHeights((prev) => removeDiffSectionMeasuredHeight(prev, index))
-      args.setSections((prev) =>
+      loadedIndicesRef.current.delete(index)
+      loadingIndicesRef.current.delete(index)
+      setSectionHeights((prev) => removeDiffSectionMeasuredHeight(prev, index))
+      setSections((prev) =>
         prev.map((section, sectionIndex) =>
           sectionIndex === index
             ? {
@@ -180,19 +196,13 @@ export function usePRFileSectionLoader(args: {
       )
       loadSection(index)
     },
-    [
-      args.loadedIndicesRef,
-      args.loadingIndicesRef,
-      args.setSectionHeights,
-      args.setSections,
-      loadSection
-    ]
+    [loadSection, loadedIndicesRef, loadingIndicesRef, setSectionHeights, setSections]
   )
 
   const toggleSection = useCallback(
     (index: number) => {
-      const shouldLoadAfterExpand = args.sectionsRef.current[index]?.collapsed ?? false
-      args.setSections((prev) =>
+      const shouldLoadAfterExpand = sectionsRef.current[index]?.collapsed ?? false
+      setSections((prev) =>
         prev.map((section, sectionIndex) =>
           sectionIndex === index ? { ...section, collapsed: !section.collapsed } : section
         )
@@ -201,19 +211,19 @@ export function usePRFileSectionLoader(args: {
         window.requestAnimationFrame(() => loadSection(index))
       }
     },
-    [args.sectionsRef, args.setSections, loadSection]
+    [loadSection, sectionsRef, setSections]
   )
 
   const setAllSectionsCollapsed = useCallback(
     (collapsed: boolean) => {
-      args.setSections((prev) => prev.map((section) => ({ ...section, collapsed })))
+      setSections((prev) => prev.map((section) => ({ ...section, collapsed })))
       if (!collapsed) {
         window.requestAnimationFrame(() => {
-          args.sectionsRef.current.forEach((_, index) => loadSection(index))
+          sectionsRef.current.forEach((_, index) => loadSection(index))
         })
       }
     },
-    [args.sectionsRef, args.setSections, loadSection]
+    [loadSection, sectionsRef, setSections]
   )
 
   return { loadSection, retrySection, toggleSection, setAllSectionsCollapsed }

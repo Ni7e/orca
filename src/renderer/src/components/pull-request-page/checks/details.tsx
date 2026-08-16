@@ -117,7 +117,7 @@ export function CheckDetailsPanel({
               <div className="flex flex-col">
                 {details!.annotations.map((annotation, index) => (
                   <div
-                    key={`${annotation.path ?? 'annotation'}-${index}`}
+                    key={`${annotation.path ?? 'annotation'}-${annotation.startLine ?? ''}-${annotation.endLine ?? ''}-${annotation.annotationLevel ?? ''}-${annotation.title ?? ''}-${annotation.message}-${annotation.rawDetails ?? ''}`}
                     className={cn(
                       'min-w-0 px-2.5 py-2 text-[12px]',
                       index > 0 && 'border-t border-border/30'
@@ -162,7 +162,7 @@ export function CheckDetailsPanel({
               <div className="flex flex-col">
                 {details!.jobs.map((job, index) => (
                   <div
-                    key={`${job.name}-${index}`}
+                    key={job.id ?? `${job.name}-${job.startedAt ?? ''}`}
                     className={cn('min-w-0 px-2.5 py-2', index > 0 && 'border-t border-border/30')}
                   >
                     <div className="flex min-w-0 items-center gap-2">
