@@ -1,5 +1,5 @@
 import { createElement } from 'react'
-import { act, create, type ReactTestRenderer } from 'react-test-renderer'
+import { act, create } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcSuccess } from '../transport/types'
@@ -118,8 +118,16 @@ async function flush(): Promise<void> {
   }
 }
 
+// react-test-renderer ships no resolvable renderer type here, so both it and
+// ReturnType<typeof create> degrade to `any` and poison this union. Name the two
+// methods the suite actually uses instead.
+type MountedHarness = {
+  unmount: () => void
+  update: (element: ReturnType<typeof createElement>) => void
+}
+
 describe('bounded pending-handle reconciliation cadence', () => {
-  let renderer: ReactTestRenderer | null = null
+  let renderer: MountedHarness | null = null
 
   beforeEach(() => {
     vi.useFakeTimers()
