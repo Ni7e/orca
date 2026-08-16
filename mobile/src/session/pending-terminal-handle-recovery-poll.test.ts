@@ -245,13 +245,12 @@ describe('bounded pending-handle reconciliation cadence', () => {
     expect(harness.requestTimes).toHaveLength(PENDING_TERMINAL_HANDLE_RECOVERY_ATTEMPTS)
   })
 
-  it('does not charge other recovery sources to the pending-terminal budget', async () => {
+  it('keeps other recovery sources live while the pending-terminal budget is parked', async () => {
     const harness = makeHarness()
     await mount(harness)
     await advance(12_000)
     expect(harness.requestTimes).toEqual([2000, 4000, 6000, 8000, 10_000])
 
-    harness.setContextKey(null)
     harness.setOtherRecoveryNeeded(true)
     await advance(14_000)
     expect(harness.requestTimes).toEqual([

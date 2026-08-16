@@ -36,21 +36,21 @@ describe('PendingTerminalHandleRecoveryContextCache', () => {
   })
 
   it('does not rescan an unchanged context on the polling hot path', () => {
-    let idReads = 0
-    const tab = terminalTab('terminal-a', null)
-    Object.defineProperty(tab, 'id', {
+    let skippedTabIdReads = 0
+    const skippedTab = terminalTab('terminal-b', 'pty-b')
+    Object.defineProperty(skippedTab, 'id', {
       get: () => {
-        idReads += 1
-        return 'terminal-a'
+        skippedTabIdReads += 1
+        return 'terminal-b'
       }
     })
-    const tabs = [tab]
+    const tabs = [skippedTab, terminalTab('terminal-a', null)]
     const cache = new PendingTerminalHandleRecoveryContextCache()
 
     const contextKey = cache.read(tabs, 'terminal-a')
-    const readsAfterFirstLookup = idReads
+    const readsAfterFirstLookup = skippedTabIdReads
     expect(readsAfterFirstLookup).toBeGreaterThan(0)
     expect(cache.read(tabs, 'terminal-a')).toBe(contextKey)
-    expect(idReads).toBe(readsAfterFirstLookup)
+    expect(skippedTabIdReads).toBe(readsAfterFirstLookup)
   })
 })
